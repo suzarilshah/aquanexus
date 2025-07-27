@@ -1,0 +1,17 @@
+{
+  "name": "register-device",
+  "version": "1.0.0",
+  "description": "Appwrite function to register ESP32 devices",
+  "main": "src/main.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "node-appwrite": "^13.0.0"
+  },
+  "devDependencies": {},
+  "keywords": ["appwrite", "function", "device", "registration"],
+  "author": "",
+  "license": "ISC"
+}

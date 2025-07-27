@@ -1,0 +1,35 @@
+{
+  "name": "aquanexus-esp32-server",
+  "version": "1.0.0",
+  "description": "ESP32 onboarding and data ingestion server for AquaNexus",
+  "main": "esp32-server.js",
+  "scripts": {
+    "start": "node esp32-server.js",
+    "dev": "nodemon esp32-server.js",
+    "test": "node test-esp32-client.js"
+  },
+  "keywords": [
+    "esp32",
+    "iot",
+    "aquaponics",
+    "sensors",
+    "websocket"
+  ],
+  "author": "AquaNexus Team",
+  "license": "MIT",
+  "dependencies": {
+    "@types/papaparse": "^5.3.16",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "papaparse": "^5.5.3",
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

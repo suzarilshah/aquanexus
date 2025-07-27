@@ -1,0 +1,17 @@
+{
+  "name": "process-data-import",
+  "version": "1.0.0",
+  "description": "Appwrite function to process CSV data imports",
+  "main": "src/main.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "node-appwrite": "^13.0.0"
+  },
+  "devDependencies": {},
+  "keywords": ["appwrite", "function", "data", "import", "csv"],
+  "author": "",
+  "license": "ISC"
+}

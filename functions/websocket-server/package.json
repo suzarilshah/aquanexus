@@ -1,0 +1,13 @@
+{
+  "name": "esp32-realtime-server",
+  "version": "1.0.0",
+  "description": "HTTP-based real-time server for ESP32 data streaming using Appwrite",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js"
+  },
+  "dependencies": {
+    "node-appwrite": "^13.0.0"
+  },
+  "type": "module"
+}
