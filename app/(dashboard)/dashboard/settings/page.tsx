@@ -6,16 +6,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Save, TestTube, CheckCircle, XCircle, Loader2, Brain } from 'lucide-react';
+import { Save, TestTube, CheckCircle, XCircle, Loader2, Brain, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface AIConfig {
   model1Name: string;
   model1Endpoint: string;
   model1ApiKey?: string;
+  model1ApiVersion?: string;
   model2Name: string;
   model2Endpoint: string;
   model2ApiKey?: string;
+  model2ApiVersion?: string;
   consensusEnabled: boolean;
+}
+
+interface ConnectionError {
+  code?: string;
+  statusCode?: number;
+  statusText?: string;
+  suggestion?: string;
+  timestamp?: string;
+  details?: string;
 }
 
 export default function SettingsPage() {
@@ -23,9 +34,11 @@ export default function SettingsPage() {
     model1Name: 'gpt-o3-mini',
     model1Endpoint: '',
     model1ApiKey: '',
+    model1ApiVersion: '',
     model2Name: 'deepseek-r1',
     model2Endpoint: '',
     model2ApiKey: '',
+    model2ApiVersion: '',
     consensusEnabled: true,
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -34,10 +47,78 @@ export default function SettingsPage() {
     model1: 'idle' | 'testing' | 'success' | 'error';
     model2: 'idle' | 'testing' | 'success' | 'error';
   }>({ model1: 'idle', model2: 'idle' });
+  const [connectionErrors, setConnectionErrors] = useState<{
+    model1?: ConnectionError;
+    model2?: ConnectionError;
+  }>({});
+  const [showErrorDetails, setShowErrorDetails] = useState<{
+    model1: boolean;
+    model2: boolean;
+  }>({ model1: false, model2: false });
 
   useEffect(() => {
     fetchConfig();
   }, []);
+
+  const renderErrorDetails = (modelKey: 'model1' | 'model2') => {
+    const error = connectionErrors[modelKey];
+    const showDetails = showErrorDetails[modelKey];
+
+    if (!error) return null;
+
+    return (
+      <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-red-800">
+                {error.code && <span className="font-mono text-xs bg-red-100 px-1 py-0.5 rounded mr-2">{error.code}</span>}
+                {error.statusCode && <span className="text-red-600">HTTP {error.statusCode}</span>}
+              </span>
+              <button
+                onClick={() => setShowErrorDetails(prev => ({ ...prev, [modelKey]: !prev[modelKey] }))}
+                className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1"
+              >
+                {showDetails ? (
+                  <>Hide details <ChevronUp className="h-3 w-3" /></>
+                ) : (
+                  <>Show details <ChevronDown className="h-3 w-3" /></>
+                )}
+              </button>
+            </div>
+
+            {error.suggestion && (
+              <p className="mt-1 text-sm text-red-700">{error.suggestion}</p>
+            )}
+
+            {showDetails && (
+              <div className="mt-2 space-y-2 text-xs">
+                {error.timestamp && (
+                  <p className="text-red-600">
+                    <span className="font-medium">Time:</span> {new Date(error.timestamp).toLocaleString()}
+                  </p>
+                )}
+                {error.statusText && (
+                  <p className="text-red-600">
+                    <span className="font-medium">Status:</span> {error.statusText}
+                  </p>
+                )}
+                {error.details && (
+                  <div className="mt-2">
+                    <p className="font-medium text-red-700 mb-1">Response details:</p>
+                    <pre className="bg-red-100 p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap break-all max-h-32 overflow-y-auto font-mono">
+                      {error.details}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const fetchConfig = async () => {
     try {
@@ -47,7 +128,9 @@ export default function SettingsPage() {
         setConfig({
           ...data.config,
           model1ApiKey: '',
+          model1ApiVersion: data.config.model1ApiVersion || '',
           model2ApiKey: '',
+          model2ApiVersion: data.config.model2ApiVersion || '',
         });
       }
     } catch {
@@ -83,28 +166,39 @@ export default function SettingsPage() {
   const testConnection = async (modelNumber: 1 | 2) => {
     const key = modelNumber === 1 ? 'model1' : 'model2';
     setTestResults((prev) => ({ ...prev, [key]: 'testing' }));
+    setConnectionErrors((prev) => ({ ...prev, [key]: undefined }));
 
     try {
       const endpoint = modelNumber === 1 ? config.model1Endpoint : config.model2Endpoint;
       const apiKey = modelNumber === 1 ? config.model1ApiKey : config.model2ApiKey;
+      const apiVersion = modelNumber === 1 ? config.model1ApiVersion : config.model2ApiVersion;
 
       const res = await fetch('/api/ai/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelNumber, endpoint, apiKey }),
+        body: JSON.stringify({ modelNumber, endpoint, apiKey, apiVersion }),
       });
 
       const data = await res.json();
 
       if (data.success) {
         setTestResults((prev) => ({ ...prev, [key]: 'success' }));
+        setConnectionErrors((prev) => ({ ...prev, [key]: undefined }));
         toast.success(`Model ${modelNumber} connection successful`);
       } else {
         setTestResults((prev) => ({ ...prev, [key]: 'error' }));
+        setConnectionErrors((prev) => ({ ...prev, [key]: data.error }));
         toast.error(data.message || `Model ${modelNumber} connection failed`);
       }
     } catch {
       setTestResults((prev) => ({ ...prev, [key]: 'error' }));
+      setConnectionErrors((prev) => ({
+        ...prev,
+        [key]: {
+          code: 'NETWORK_ERROR',
+          suggestion: 'Could not reach the server. Check your network connection.',
+        },
+      }));
       toast.error(`Model ${modelNumber} connection test failed`);
     }
   };
@@ -202,6 +296,21 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
+                <Label htmlFor="model1ApiVersion">API Version</Label>
+                <Input
+                  id="model1ApiVersion"
+                  value={config.model1ApiVersion}
+                  onChange={(e) =>
+                    setConfig({ ...config, model1ApiVersion: e.target.value })
+                  }
+                  placeholder="2024-02-15-preview"
+                  className="mt-1"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Azure OpenAI API version (e.g., 2024-02-15-preview)
+                </p>
+              </div>
+              <div>
                 <Label htmlFor="model1ApiKey">API Key</Label>
                 <Input
                   id="model1ApiKey"
@@ -215,6 +324,8 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
+
+            {renderErrorDetails('model1')}
           </div>
 
           {/* Model 2 - DeepSeek R1 */}
@@ -263,6 +374,21 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
+                <Label htmlFor="model2ApiVersion">API Version</Label>
+                <Input
+                  id="model2ApiVersion"
+                  value={config.model2ApiVersion}
+                  onChange={(e) =>
+                    setConfig({ ...config, model2ApiVersion: e.target.value })
+                  }
+                  placeholder="2024-02-15-preview"
+                  className="mt-1"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Azure OpenAI API version (e.g., 2024-02-15-preview)
+                </p>
+              </div>
+              <div>
                 <Label htmlFor="model2ApiKey">API Key</Label>
                 <Input
                   id="model2ApiKey"
@@ -276,6 +402,8 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
+
+            {renderErrorDetails('model2')}
           </div>
 
           {/* Consensus Toggle */}

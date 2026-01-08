@@ -18,8 +18,10 @@ export async function GET() {
         id: aiConfig.id,
         model1Name: aiConfig.model1Name,
         model1Endpoint: aiConfig.model1Endpoint,
+        model1ApiVersion: aiConfig.model1ApiVersion,
         model2Name: aiConfig.model2Name,
         model2Endpoint: aiConfig.model2Endpoint,
+        model2ApiVersion: aiConfig.model2ApiVersion,
         consensusEnabled: aiConfig.consensusEnabled,
         updatedAt: aiConfig.updatedAt,
       })
@@ -32,8 +34,10 @@ export async function GET() {
         config: {
           model1Name: 'gpt-o3-mini',
           model1Endpoint: '',
+          model1ApiVersion: '',
           model2Name: 'deepseek-r1',
           model2Endpoint: '',
+          model2ApiVersion: '',
           consensusEnabled: true,
         },
       });
@@ -61,9 +65,11 @@ export async function POST(request: Request) {
       model1Name,
       model1Endpoint,
       model1ApiKey,
+      model1ApiVersion,
       model2Name,
       model2Endpoint,
       model2ApiKey,
+      model2ApiVersion,
       consensusEnabled,
     } = await request.json();
 
@@ -78,9 +84,11 @@ export async function POST(request: Request) {
       model1Name: model1Name || 'gpt-o3-mini',
       model1Endpoint,
       model1ApiKey,
+      model1ApiVersion,
       model2Name: model2Name || 'deepseek-r1',
       model2Endpoint,
       model2ApiKey,
+      model2ApiVersion,
       consensusEnabled: consensusEnabled ?? true,
       updatedAt: new Date(),
     };
@@ -108,8 +116,10 @@ export async function POST(request: Request) {
         id: savedConfig[0].id,
         model1Name: savedConfig[0].model1Name,
         model1Endpoint: savedConfig[0].model1Endpoint,
+        model1ApiVersion: savedConfig[0].model1ApiVersion,
         model2Name: savedConfig[0].model2Name,
         model2Endpoint: savedConfig[0].model2Endpoint,
+        model2ApiVersion: savedConfig[0].model2ApiVersion,
         consensusEnabled: savedConfig[0].consensusEnabled,
       },
     });
@@ -130,7 +140,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { modelNumber, endpoint, apiKey } = await request.json();
+    const { modelNumber, endpoint, apiKey, apiVersion } = await request.json();
 
     if (!modelNumber || !endpoint || !apiKey) {
       return NextResponse.json(
@@ -139,23 +149,46 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Test the connection
-    const isConnected = await testAIConnection({
+    // Test the connection with detailed error logging
+    const result = await testAIConnection({
       name: `Model ${modelNumber}`,
       endpoint,
       apiKey,
+      apiVersion,
     });
 
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        message: 'Connection successful',
+      });
+    }
+
+    // Return detailed error information for debugging
     return NextResponse.json({
-      success: isConnected,
-      message: isConnected
-        ? 'Connection successful'
-        : 'Connection failed. Please check endpoint and API key.',
+      success: false,
+      message: result.error?.message || 'Connection failed',
+      error: {
+        code: result.error?.code,
+        statusCode: result.error?.statusCode,
+        statusText: result.error?.statusText,
+        suggestion: result.error?.suggestion,
+        timestamp: result.error?.timestamp,
+        details: result.error?.responseBody,
+      },
     });
   } catch (error) {
     console.error('Test AI connection error:', error);
     return NextResponse.json(
-      { error: 'Connection test failed' },
+      {
+        success: false,
+        message: 'Connection test failed unexpectedly',
+        error: {
+          code: 'INTERNAL_ERROR',
+          suggestion: 'Please try again. If the problem persists, check server logs.',
+          timestamp: new Date().toISOString(),
+        },
+      },
       { status: 500 }
     );
   }
