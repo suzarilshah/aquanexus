@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import type { BoardDefinition, PinDefinition, PinCapability } from '@/data/boards';
 import type { SensorDefinition } from '@/data/sensors';
-import { SENSORS, SENSOR_CATEGORIES, getSensorsByCategory, type SensorCategory } from '@/data/sensors';
+import { SENSOR_CATEGORIES, getSensorsByCategory, type SensorCategory } from '@/data/sensors';
 import * as Popover from '@radix-ui/react-popover';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
@@ -27,6 +27,15 @@ import {
   AlertTriangle,
   Zap,
   Info,
+  Cpu,
+  Link2,
+  Terminal,
+  Activity,
+  Minus,
+  Tag,
+  ChevronDown,
+  ChevronUp,
+  Usb,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -47,6 +56,18 @@ const ICONS: Record<string, React.ComponentType<{ className?: string; style?: Re
   Monitor,
   Radio,
 };
+
+// Pin type colors matching pinouts.vercel.app design
+const PIN_COLORS = {
+  POWER: '#ef4444',
+  GND: '#6b7280',
+  DIGITAL: '#3b82f6',
+  ANALOG: '#eab308',
+  I2C: '#8b5cf6',
+  SPI: '#f97316',
+  UART: '#ec4899',
+  PWM: '#10b981',
+} as const;
 
 export interface PinAssignment {
   pinId: string;
@@ -72,11 +93,121 @@ export function BoardVisualizer({
 }: BoardVisualizerProps) {
   const [selectedPin, setSelectedPin] = useState<PinDefinition | null>(null);
   const [hoveredPin, setHoveredPin] = useState<string | null>(null);
+  const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
+  const [showBoardInfo, setShowBoardInfo] = useState(false);
 
   const getAssignmentForPin = useCallback(
     (pinId: string) => assignments.find((a) => a.pinId === pinId),
     [assignments]
   );
+
+  const leftPins = board.pins.filter((p) => p.side === 'left');
+  const rightPins = board.pins.filter((p) => p.side === 'right');
+
+  // Calculate pin categories for the sidebar
+  const pinCategories = useMemo(() => {
+    const categories: Array<{
+      id: string;
+      name: string;
+      icon: React.ReactNode;
+      color: string;
+      bgColor: string;
+      count: number;
+    }> = [];
+
+    const i2cPins = board.pins.filter(p =>
+      p.capabilities.includes('I2C_SDA') || p.capabilities.includes('I2C_SCL')
+    );
+    if (i2cPins.length > 0) {
+      categories.push({
+        id: 'I2C',
+        name: 'I2C',
+        icon: <Link2 className="w-4 h-4" />,
+        color: 'text-purple-600',
+        bgColor: 'bg-purple-100',
+        count: i2cPins.length,
+      });
+    }
+
+    const uartPins = board.pins.filter(p =>
+      p.capabilities.includes('UART_TX') || p.capabilities.includes('UART_RX')
+    );
+    if (uartPins.length > 0) {
+      categories.push({
+        id: 'UART',
+        name: 'UART',
+        icon: <Terminal className="w-4 h-4" />,
+        color: 'text-pink-600',
+        bgColor: 'bg-pink-100',
+        count: uartPins.length,
+      });
+    }
+
+    const spiPins = board.pins.filter(p =>
+      p.capabilities.includes('SPI_MOSI') || p.capabilities.includes('SPI_MISO') ||
+      p.capabilities.includes('SPI_CLK') || p.capabilities.includes('SPI_CS')
+    );
+    if (spiPins.length > 0) {
+      categories.push({
+        id: 'SPI',
+        name: 'SPI',
+        icon: <Radio className="w-4 h-4" />,
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-100',
+        count: spiPins.length,
+      });
+    }
+
+    const pwmPins = board.pins.filter(p => p.capabilities.includes('PWM'));
+    if (pwmPins.length > 0) {
+      categories.push({
+        id: 'PWM',
+        name: 'PWM',
+        icon: <Activity className="w-4 h-4" />,
+        color: 'text-emerald-600',
+        bgColor: 'bg-emerald-100',
+        count: pwmPins.length,
+      });
+    }
+
+    const adcPins = board.pins.filter(p => p.capabilities.includes('ADC'));
+    if (adcPins.length > 0) {
+      categories.push({
+        id: 'ADC',
+        name: 'ADC',
+        icon: <Gauge className="w-4 h-4" />,
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-100',
+        count: adcPins.length,
+      });
+    }
+
+    const powerPins = board.pins.filter(p => p.capabilities.includes('POWER'));
+    if (powerPins.length > 0) {
+      categories.push({
+        id: 'POWER',
+        name: 'Power',
+        icon: <Zap className="w-4 h-4" />,
+        color: 'text-red-600',
+        bgColor: 'bg-red-100',
+        count: powerPins.length,
+      });
+    }
+
+    const gndPins = board.pins.filter(p => p.capabilities.includes('GND'));
+    if (gndPins.length > 0) {
+      categories.push({
+        id: 'GND',
+        name: 'Ground',
+        icon: <Minus className="w-4 h-4" />,
+        color: 'text-gray-600',
+        bgColor: 'bg-gray-100',
+        count: gndPins.length,
+      });
+    }
+
+    return categories;
+  }, [board.pins]);
 
   const getPinColor = useCallback(
     (pin: PinDefinition) => {
@@ -85,27 +216,45 @@ export function BoardVisualizer({
         return assignment.sensor.color;
       }
 
-      // Color by primary capability
-      if (pin.capabilities.includes('POWER')) {
-        return pin.voltage === 5 ? '#ef4444' : '#22c55e';
-      }
-      if (pin.capabilities.includes('GND')) return '#1f2937';
-      if (pin.capabilities.includes('ADC')) return '#8b5cf6';
-      if (pin.capabilities.includes('I2C_SDA') || pin.capabilities.includes('I2C_SCL'))
-        return '#06b6d4';
-      if (pin.capabilities.includes('SPI_MOSI') || pin.capabilities.includes('SPI_MISO'))
-        return '#f97316';
-      if (pin.capabilities.includes('UART_TX') || pin.capabilities.includes('UART_RX'))
-        return '#ec4899';
-      if (pin.strapping) return '#fbbf24';
-      return '#64748b';
+      if (pin.capabilities.includes('POWER')) return PIN_COLORS.POWER;
+      if (pin.capabilities.includes('GND')) return PIN_COLORS.GND;
+      if (pin.capabilities.includes('I2C_SDA') || pin.capabilities.includes('I2C_SCL')) return PIN_COLORS.I2C;
+      if (pin.capabilities.includes('UART_TX') || pin.capabilities.includes('UART_RX')) return PIN_COLORS.UART;
+      if (pin.capabilities.includes('SPI_MOSI') || pin.capabilities.includes('SPI_MISO') ||
+          pin.capabilities.includes('SPI_CLK') || pin.capabilities.includes('SPI_CS')) return PIN_COLORS.SPI;
+      if (pin.capabilities.includes('ADC')) return PIN_COLORS.ANALOG;
+      return PIN_COLORS.DIGITAL;
     },
     [getAssignmentForPin]
   );
 
+  const isPinHighlighted = useCallback((pin: PinDefinition): boolean => {
+    if (!highlightedCategory) return true;
+
+    switch (highlightedCategory) {
+      case 'I2C':
+        return pin.capabilities.includes('I2C_SDA') || pin.capabilities.includes('I2C_SCL');
+      case 'UART':
+        return pin.capabilities.includes('UART_TX') || pin.capabilities.includes('UART_RX');
+      case 'SPI':
+        return pin.capabilities.includes('SPI_MOSI') || pin.capabilities.includes('SPI_MISO') ||
+               pin.capabilities.includes('SPI_CLK') || pin.capabilities.includes('SPI_CS');
+      case 'PWM':
+        return pin.capabilities.includes('PWM');
+      case 'ADC':
+        return pin.capabilities.includes('ADC');
+      case 'POWER':
+        return pin.capabilities.includes('POWER');
+      case 'GND':
+        return pin.capabilities.includes('GND');
+      default:
+        return true;
+    }
+  }, [highlightedCategory]);
+
   const handlePinClick = (pin: PinDefinition) => {
     if (pin.capabilities.includes('POWER') || pin.capabilities.includes('GND')) {
-      return; // Don't allow selection of power/ground pins
+      return;
     }
     setSelectedPin(pin);
   };
@@ -128,274 +277,354 @@ export function BoardVisualizer({
   };
 
   const canAssignSensor = (pin: PinDefinition, sensor: SensorDefinition, sensorPin: { capabilities: PinCapability[] }) => {
-    // Check if pin has required capabilities
     return sensorPin.capabilities.some((cap) => pin.capabilities.includes(cap));
   };
 
-  const leftPins = board.pins.filter((p) => p.side === 'left');
-  const rightPins = board.pins.filter((p) => p.side === 'right');
+  const getPinTypeLabel = (pin: PinDefinition): string => {
+    if (pin.capabilities.includes('POWER')) return 'Power';
+    if (pin.capabilities.includes('GND')) return 'Ground';
+    if (pin.capabilities.includes('ADC')) return 'Analog';
+    return 'Digital';
+  };
+
+  const getPinTypeColor = (pin: PinDefinition): string => {
+    if (pin.capabilities.includes('POWER')) return 'bg-red-100 text-red-700';
+    if (pin.capabilities.includes('GND')) return 'bg-gray-100 text-gray-700';
+    if (pin.capabilities.includes('ADC')) return 'bg-yellow-100 text-yellow-700';
+    return 'bg-blue-100 text-blue-700';
+  };
+
+  const renderPin = (pin: PinDefinition, side: 'left' | 'right', index: number) => {
+    const assignment = getAssignmentForPin(pin.id);
+    const isHovered = hoveredPin === pin.id;
+    const isSelected = selectedPin?.id === pin.id;
+    const isHighlighted = isPinHighlighted(pin);
+    const isPowerOrGnd = pin.capabilities.includes('POWER') || pin.capabilities.includes('GND');
+
+    return (
+      <Popover.Root key={pin.id} open={isSelected} onOpenChange={(open) => !open && setSelectedPin(null)}>
+        <Popover.Trigger asChild>
+          <div
+            className={cn(
+              'flex items-center gap-2 py-1.5 px-2 rounded-md transition-all',
+              side === 'left' ? 'flex-row' : 'flex-row-reverse',
+              !isPowerOrGnd && 'cursor-pointer',
+              (isHovered || isSelected) && 'bg-slate-700/50',
+              !isHighlighted && highlightedCategory && 'opacity-30'
+            )}
+            onMouseEnter={() => setHoveredPin(pin.id)}
+            onMouseLeave={() => setHoveredPin(null)}
+            onClick={() => handlePinClick(pin)}
+          >
+            {/* Pin label */}
+            <span className={cn(
+              'text-xs font-mono w-16',
+              side === 'left' ? 'text-right' : 'text-left',
+              (isHovered || isSelected) ? 'text-white font-medium' : 'text-slate-400'
+            )}>
+              {pin.name}
+            </span>
+
+            {/* Pin number */}
+            <span className="text-xs font-mono w-6 text-center text-slate-500">
+              {index + 1}
+            </span>
+
+            {/* Pin dot */}
+            <div
+              className={cn(
+                'w-3 h-3 rounded-full transition-all flex-shrink-0 relative',
+                (isHovered || isSelected) && 'ring-2 ring-offset-1 ring-offset-slate-800 ring-white/50 scale-125'
+              )}
+              style={{ backgroundColor: getPinColor(pin) }}
+            >
+              {assignment && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                </div>
+              )}
+            </div>
+          </div>
+        </Popover.Trigger>
+
+        <Popover.Portal>
+          <Popover.Content
+            className="z-50 w-80 rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden"
+            sideOffset={10}
+            side={side === 'left' ? 'left' : 'right'}
+          >
+            <PinPopoverContent
+              pin={pin}
+              assignment={assignment}
+              onSelectSensor={handleSensorSelect}
+              onUnassign={() => handleUnassign(pin.id)}
+              canAssignSensor={canAssignSensor}
+            />
+            <Popover.Arrow className="fill-white" />
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+    );
+  };
 
   return (
-    <div className={cn('relative', className)}>
-      {/* Board SVG */}
-      <svg
-        viewBox="0 0 400 500"
-        className="w-full max-w-md mx-auto"
-        style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}
-      >
-        {/* Board background */}
-        <defs>
-          <linearGradient id="boardGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#1e3a5f" />
-            <stop offset="100%" stopColor="#0f172a" />
-          </linearGradient>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
+    <div className={cn('grid grid-cols-1 lg:grid-cols-3 gap-6', className)}>
+      {/* Left: Interactive Pinout - inspired by pinouts.vercel.app */}
+      <div className="lg:col-span-2">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <Cpu className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Interactive Pinout</h3>
+                <p className="text-xs text-gray-500">Explore pins with hover details and category highlighting</p>
+              </div>
+            </div>
+          </div>
 
-        {/* PCB Board */}
-        <rect
-          x="60"
-          y="30"
-          width="280"
-          height="440"
-          rx="8"
-          fill="url(#boardGradient)"
-          stroke="#334155"
-          strokeWidth="2"
-        />
+          {/* Board stats bar */}
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-gray-400" />
+              <span className="text-sm font-medium text-gray-700">{board.name}</span>
+              <span className="text-xs text-gray-400">Interactive Board Layout</span>
+            </div>
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              <span><span className="font-semibold text-gray-700">{board.pins.length}</span> Total</span>
+              <span><span className="font-semibold text-gray-700">{assignments.length}</span> Assigned</span>
+            </div>
+          </div>
 
-        {/* USB Connector */}
-        <rect x="160" y="25" width="80" height="25" rx="2" fill="#4b5563" stroke="#6b7280" strokeWidth="1" />
-        <rect x="170" y="30" width="60" height="15" rx="1" fill="#1f2937" />
+          {/* Legend */}
+          <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIN_COLORS.POWER }} />
+              <span className="text-xs text-gray-500">Power</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIN_COLORS.GND }} />
+              <span className="text-xs text-gray-500">Ground</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIN_COLORS.DIGITAL }} />
+              <span className="text-xs text-gray-500">Digital</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIN_COLORS.ANALOG }} />
+              <span className="text-xs text-gray-500">Analog</span>
+            </div>
+            <div className="ml-auto text-xs text-gray-400 flex items-center gap-1">
+              <span>Click to explore</span>
+            </div>
+          </div>
 
-        {/* ESP32 Chip */}
-        <rect x="130" y="180" width="140" height="100" rx="4" fill="#1f2937" stroke="#374151" strokeWidth="1" />
-        <text x="200" y="220" textAnchor="middle" fill="#9ca3af" fontSize="10" fontFamily="monospace">
-          ESP32
-        </text>
-        <text x="200" y="235" textAnchor="middle" fill="#6b7280" fontSize="8" fontFamily="monospace">
-          WROOM-32
-        </text>
-        <text x="200" y="260" textAnchor="middle" fill="#4b5563" fontSize="6" fontFamily="monospace">
-          {board.name}
-        </text>
+          {/* Pinout diagram - clean modern style */}
+          <div className="p-6">
+            <div className="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-xl p-4 mx-auto shadow-lg border border-slate-700">
+              {/* USB Connector */}
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 h-4 bg-gray-600 rounded-t-sm border-2 border-gray-500 shadow-md" />
 
-        {/* Antenna marking */}
-        <rect x="160" y="85" width="80" height="70" rx="2" fill="none" stroke="#374151" strokeWidth="1" strokeDasharray="4,2" />
-        <text x="200" y="125" textAnchor="middle" fill="#4b5563" fontSize="8" fontFamily="monospace">
-          ANTENNA
-        </text>
+              {/* Board content */}
+              <div className="flex justify-between gap-4 pt-4">
+                {/* Left pins */}
+                <div className="flex flex-col">
+                  {leftPins.map((pin, idx) => renderPin(pin, 'left', idx))}
+                </div>
 
-        {/* Pin rows */}
-        {/* Left side pins */}
-        {leftPins.map((pin, idx) => {
-          const assignment = getAssignmentForPin(pin.id);
-          const y = 70 + idx * 22;
-          const isHovered = hoveredPin === pin.id;
-          const isSelected = selectedPin?.id === pin.id;
-          const isPowerOrGnd = pin.capabilities.includes('POWER') || pin.capabilities.includes('GND');
+                {/* Center - Chip representation */}
+                <div className="flex flex-col items-center justify-center min-w-[140px]">
+                  <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 shadow-inner">
+                    <div className="text-center">
+                      <div className="w-24 h-24 bg-slate-900 rounded-md border border-slate-600 flex items-center justify-center mb-2 shadow-inner">
+                        <div className="text-[10px] text-slate-400 font-mono text-center">
+                          <div className="font-semibold text-slate-300">{board.microcontroller.split('-')[0]}</div>
+                          <div className="mt-1">{board.microcontroller.split('-').slice(1).join('-')}</div>
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">{board.name}</div>
+                      <div className="text-[8px] text-slate-600 font-mono mt-0.5">Rev 1.0</div>
+                    </div>
+                  </div>
 
-          return (
-            <g key={pin.id}>
-              {/* Pin connector trace */}
-              <line x1="60" y1={y} x2="75" y2={y} stroke="#374151" strokeWidth="2" />
+                  {/* USB label */}
+                  <div className="mt-auto pt-4 flex items-center gap-1 text-slate-500">
+                    <Usb className="w-3 h-3" />
+                    <span className="text-[10px] font-mono">USB</span>
+                  </div>
+                </div>
 
-              {/* Pin hole */}
-              <Popover.Root open={isSelected} onOpenChange={(open) => !open && setSelectedPin(null)}>
-                <Popover.Trigger asChild>
-                  <g
-                    className={cn(
-                      'cursor-pointer transition-transform',
-                      !isPowerOrGnd && 'hover:scale-110'
-                    )}
-                    onClick={() => handlePinClick(pin)}
-                    onMouseEnter={() => setHoveredPin(pin.id)}
-                    onMouseLeave={() => setHoveredPin(null)}
-                  >
-                    {/* Pin circle */}
-                    <circle
-                      cx="48"
-                      cy={y}
-                      r={isHovered || isSelected ? 10 : 8}
-                      fill={getPinColor(pin)}
-                      stroke={isSelected ? '#fff' : isHovered ? '#e2e8f0' : '#475569'}
-                      strokeWidth={isSelected ? 3 : 2}
-                      filter={assignment ? 'url(#glow)' : undefined}
-                      className="transition-all duration-200"
-                    />
+                {/* Right pins */}
+                <div className="flex flex-col">
+                  {rightPins.map((pin, idx) => renderPin(pin, 'right', idx))}
+                </div>
+              </div>
+            </div>
+          </div>
 
-                    {/* Assignment indicator */}
-                    {assignment && (
-                      <circle cx="48" cy={y} r="4" fill="#fff" opacity="0.9" />
-                    )}
-                  </g>
-                </Popover.Trigger>
+          {/* Footer hint */}
+          <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex items-center gap-4">
+            <span className="flex items-center gap-1">
+              <Info className="w-3 h-3" />
+              Hover for details
+            </span>
+            <span className="flex items-center gap-1">
+              <Tag className="w-3 h-3" />
+              Click categories to highlight
+            </span>
+            <span className="flex items-center gap-1">
+              <Zap className="w-3 h-3" />
+              Use pin categories
+            </span>
+          </div>
+        </div>
+      </div>
 
-                <Popover.Portal>
-                  <Popover.Content
-                    className="z-50 w-80 rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden"
-                    sideOffset={10}
-                    side="left"
-                  >
-                    <PinPopoverContent
-                      pin={pin}
-                      assignment={assignment}
-                      onSelectSensor={handleSensorSelect}
-                      onUnassign={() => handleUnassign(pin.id)}
-                      canAssignSensor={canAssignSensor}
-                    />
-                    <Popover.Arrow className="fill-white" />
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover.Root>
+      {/* Right: Board Info Panel - inspired by pinouts.vercel.app */}
+      <div className="space-y-4">
+        {/* Board Header Card */}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="text-xl font-bold text-gray-900">{board.name}</h2>
+            <button
+              onClick={() => setShowBoardInfo(!showBoardInfo)}
+              className="mt-2 text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 transition-colors"
+            >
+              Click to view board information
+              {showBoardInfo ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </div>
 
-              {/* Pin label */}
-              <text
-                x="25"
-                y={y + 4}
-                textAnchor="end"
-                fill={isHovered || isSelected ? '#f1f5f9' : '#94a3b8'}
-                fontSize="9"
-                fontFamily="monospace"
-                className="select-none transition-colors"
-              >
-                {pin.name}
-              </text>
+          {/* Pin Categories */}
+          <div className="px-5 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pin Categories</span>
+              <span className="text-xs text-gray-400">{pinCategories.length}</span>
+            </div>
 
-              {/* GPIO number badge */}
-              {pin.gpio !== null && (
-                <text
-                  x="8"
-                  y={y + 4}
-                  textAnchor="end"
-                  fill="#64748b"
-                  fontSize="7"
-                  fontFamily="monospace"
-                  className="select-none"
+            <div className="grid grid-cols-2 gap-2">
+              {pinCategories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => setHighlightedCategory(highlightedCategory === category.id ? null : category.id)}
+                  className={cn(
+                    'flex items-center justify-between px-3 py-2.5 rounded-lg border transition-all text-left',
+                    highlightedCategory === category.id
+                      ? `${category.bgColor} border-current ${category.color}`
+                      : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  )}
                 >
-                  {pin.gpio}
-                </text>
+                  <div className="flex items-center gap-2">
+                    <span className={category.color}>{category.icon}</span>
+                    <span className={cn(
+                      'text-sm font-medium',
+                      highlightedCategory === category.id ? category.color : 'text-gray-700'
+                    )}>
+                      {category.name}
+                    </span>
+                  </div>
+                  <span className={cn(
+                    'text-sm font-semibold',
+                    highlightedCategory === category.id ? category.color : 'text-gray-500'
+                  )}>
+                    {category.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Selected Pin Details Card */}
+        {selectedPin && (
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Pin Details</h3>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500">Pin</span>
+                <span className="font-mono text-sm font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">
+                  {selectedPin.gpio !== null ? selectedPin.gpio : selectedPin.name}
+                </span>
+                <span className="text-xs text-gray-500">Type</span>
+                <span className={cn(
+                  'text-xs font-medium px-2 py-0.5 rounded-full',
+                  getPinTypeColor(selectedPin)
+                )}>
+                  {getPinTypeLabel(selectedPin)}
+                </span>
+              </div>
+
+              {selectedPin.aliases.length > 0 && (
+                <div>
+                  <div className="text-xs font-medium text-gray-600 mb-2">Names</div>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedPin.aliases.map((alias) => (
+                      <span key={alias} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded font-mono">
+                        {alias}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
-            </g>
-          );
-        })}
 
-        {/* Right side pins */}
-        {rightPins.map((pin, idx) => {
-          const assignment = getAssignmentForPin(pin.id);
-          const y = 70 + idx * 22;
-          const isHovered = hoveredPin === pin.id;
-          const isSelected = selectedPin?.id === pin.id;
-          const isPowerOrGnd = pin.capabilities.includes('POWER') || pin.capabilities.includes('GND');
-
-          return (
-            <g key={pin.id}>
-              {/* Pin connector trace */}
-              <line x1="325" y1={y} x2="340" y2={y} stroke="#374151" strokeWidth="2" />
-
-              {/* Pin hole */}
-              <Popover.Root open={isSelected} onOpenChange={(open) => !open && setSelectedPin(null)}>
-                <Popover.Trigger asChild>
-                  <g
-                    className={cn(
-                      'cursor-pointer transition-transform',
-                      !isPowerOrGnd && 'hover:scale-110'
-                    )}
-                    onClick={() => handlePinClick(pin)}
-                    onMouseEnter={() => setHoveredPin(pin.id)}
-                    onMouseLeave={() => setHoveredPin(null)}
-                  >
-                    <circle
-                      cx="352"
-                      cy={y}
-                      r={isHovered || isSelected ? 10 : 8}
-                      fill={getPinColor(pin)}
-                      stroke={isSelected ? '#fff' : isHovered ? '#e2e8f0' : '#475569'}
-                      strokeWidth={isSelected ? 3 : 2}
-                      filter={assignment ? 'url(#glow)' : undefined}
-                      className="transition-all duration-200"
-                    />
-
-                    {assignment && (
-                      <circle cx="352" cy={y} r="4" fill="#fff" opacity="0.9" />
-                    )}
-                  </g>
-                </Popover.Trigger>
-
-                <Popover.Portal>
-                  <Popover.Content
-                    className="z-50 w-80 rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden"
-                    sideOffset={10}
-                    side="right"
-                  >
-                    <PinPopoverContent
-                      pin={pin}
-                      assignment={assignment}
-                      onSelectSensor={handleSensorSelect}
-                      onUnassign={() => handleUnassign(pin.id)}
-                      canAssignSensor={canAssignSensor}
-                    />
-                    <Popover.Arrow className="fill-white" />
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover.Root>
-
-              {/* Pin label */}
-              <text
-                x="375"
-                y={y + 4}
-                textAnchor="start"
-                fill={isHovered || isSelected ? '#f1f5f9' : '#94a3b8'}
-                fontSize="9"
-                fontFamily="monospace"
-                className="select-none transition-colors"
-              >
-                {pin.name}
-              </text>
-
-              {/* GPIO number badge */}
-              {pin.gpio !== null && (
-                <text
-                  x="392"
-                  y={y + 4}
-                  textAnchor="start"
-                  fill="#64748b"
-                  fontSize="7"
-                  fontFamily="monospace"
-                  className="select-none"
-                >
-                  {pin.gpio}
-                </text>
+              {selectedPin.strapping && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 text-amber-700">
+                    <AlertTriangle className="w-3 h-3" />
+                    <span className="text-xs font-medium">Strapping Pin</span>
+                  </div>
+                </div>
               )}
-            </g>
-          );
-        })}
+            </div>
+          </div>
+        )}
 
-        {/* Legend */}
-        <g transform="translate(60, 460)">
-          <text x="0" y="0" fill="#64748b" fontSize="8" fontFamily="sans-serif" fontWeight="500">
-            Pin Types:
-          </text>
-          <circle cx="8" cy="15" r="5" fill="#22c55e" />
-          <text x="18" y="18" fill="#94a3b8" fontSize="7">3.3V</text>
-          <circle cx="48" cy="15" r="5" fill="#ef4444" />
-          <text x="58" y="18" fill="#94a3b8" fontSize="7">5V</text>
-          <circle cx="88" cy="15" r="5" fill="#1f2937" />
-          <text x="98" y="18" fill="#94a3b8" fontSize="7">GND</text>
-          <circle cx="128" cy="15" r="5" fill="#8b5cf6" />
-          <text x="138" y="18" fill="#94a3b8" fontSize="7">ADC</text>
-          <circle cx="168" cy="15" r="5" fill="#06b6d4" />
-          <text x="178" y="18" fill="#94a3b8" fontSize="7">I2C</text>
-          <circle cx="208" cy="15" r="5" fill="#fbbf24" />
-          <text x="218" y="18" fill="#94a3b8" fontSize="7">Strapping</text>
-        </g>
-      </svg>
+        {/* Board Information Card (collapsible) */}
+        {showBoardInfo && (
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Board Information</h3>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <p className="text-sm text-gray-600">{board.description}</p>
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+                  <Cpu className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{board.microcontroller}</div>
+                  <div className="text-xs text-gray-500">Main processing unit</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                <div>
+                  <div className="text-xs text-gray-500">Clock Speed</div>
+                  <div className="text-sm font-semibold text-gray-900">{board.clockSpeed}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Voltage</div>
+                  <div className="text-sm font-semibold text-gray-900">{board.voltage}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Flash</div>
+                  <div className="text-sm font-semibold text-gray-900">{board.flashSize}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">RAM</div>
+                  <div className="text-sm font-semibold text-gray-900">{board.ram}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
