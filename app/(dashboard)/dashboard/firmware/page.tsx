@@ -45,8 +45,9 @@ export default function FirmwareConfiguratorPage() {
   const [deviceType, setDeviceType] = useState<'fish' | 'plant' | 'general'>('fish');
   const [serverHost, setServerHost] = useState('aquanexus.vercel.app');
   const [serverPort, setServerPort] = useState(443);
-  const [sensorInterval, setSensorInterval] = useState(5000);
-  const [useWebSocket, setUseWebSocket] = useState(true);
+  const [sensorInterval, setSensorInterval] = useState(10000);
+  const [useWebSocket, setUseWebSocket] = useState(false);
+  const [useAbly, setUseAbly] = useState(true);
   const [enableOTA, setEnableOTA] = useState(false);
   const [enableDeepSleep, setEnableDeepSleep] = useState(false);
   const [deepSleepDuration, setDeepSleepDuration] = useState(300);
@@ -77,6 +78,7 @@ export default function FirmwareConfiguratorPage() {
       serverHost,
       serverPort,
       useWebSocket,
+      useAbly,
       sensorInterval,
       enableOTA,
       enableDeepSleep,
@@ -90,6 +92,7 @@ export default function FirmwareConfiguratorPage() {
     serverHost,
     serverPort,
     useWebSocket,
+    useAbly,
     sensorInterval,
     enableOTA,
     enableDeepSleep,
@@ -435,23 +438,61 @@ export default function FirmwareConfiguratorPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg border border-purple-100">
                     <div className="flex items-center gap-3">
                       <Radio className="h-5 w-5 text-purple-500" />
                       <div>
-                        <Label htmlFor="useWebSocket" className="text-sm font-medium">
-                          Use WebSocket
+                        <Label htmlFor="useAbly" className="text-sm font-medium">
+                          Use Ably Real-time (Recommended)
                         </Label>
                         <p className="text-xs text-gray-500">
-                          Real-time bidirectional communication
+                          Cloud-based pub/sub messaging for Vercel
+                        </p>
+                      </div>
+                    </div>
+                    <Switch.Root
+                      id="useAbly"
+                      checked={useAbly}
+                      onCheckedChange={(checked) => {
+                        setUseAbly(checked);
+                        if (checked) setUseWebSocket(false);
+                      }}
+                      className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-purple-500 transition-colors"
+                    >
+                      <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow transition-transform translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
+                    </Switch.Root>
+                  </div>
+
+                  {useAbly && (
+                    <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
+                      <p className="text-xs text-purple-700">
+                        <strong>Ably</strong> provides real-time messaging. The ESP32 will publish sensor data to Ably channels,
+                        and your dashboard will subscribe to receive updates instantly. Works with Vercel serverless deployment.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Wifi className="h-5 w-5 text-blue-500" />
+                      <div>
+                        <Label htmlFor="useWebSocket" className="text-sm font-medium">
+                          Direct WebSocket (Advanced)
+                        </Label>
+                        <p className="text-xs text-gray-500">
+                          Requires custom WebSocket server
                         </p>
                       </div>
                     </div>
                     <Switch.Root
                       id="useWebSocket"
                       checked={useWebSocket}
-                      onCheckedChange={setUseWebSocket}
-                      className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-500 transition-colors"
+                      onCheckedChange={(checked) => {
+                        setUseWebSocket(checked);
+                        if (checked) setUseAbly(false);
+                      }}
+                      disabled={useAbly}
+                      className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-500 transition-colors disabled:opacity-50"
                     >
                       <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow transition-transform translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
                     </Switch.Root>
