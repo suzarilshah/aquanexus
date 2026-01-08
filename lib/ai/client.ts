@@ -74,7 +74,7 @@ export async function callAIModel(
           },
         ],
         temperature: 0.3,
-        max_tokens: 1000,
+        max_completion_tokens: 1000,
       }),
     });
 
@@ -237,7 +237,7 @@ export async function testAIConnection(config: AIModelConfig): Promise<AIConnect
         messages: [
           { role: 'user', content: 'Hello, respond with "OK" only.' },
         ],
-        max_tokens: 10,
+        max_completion_tokens: 10,
       }),
       signal: controller.signal,
     });
