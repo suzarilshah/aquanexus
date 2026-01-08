@@ -13,6 +13,7 @@ import {
   Cpu,
   ChevronRight,
   Zap,
+  CircuitBoard,
 } from 'lucide-react';
 
 const navigation = [
@@ -21,6 +22,7 @@ const navigation = [
   { name: 'Plant Environment', href: '/dashboard/plants', icon: Leaf, description: 'Track plant growth' },
   { name: 'AI Analysis', href: '/dashboard/ai', icon: Brain, description: 'Dual AI consensus' },
   { name: 'Devices', href: '/dashboard/devices', icon: Cpu, description: 'ESP32 management' },
+  { name: 'Firmware', href: '/dashboard/firmware', icon: CircuitBoard, description: 'Configure & flash' },
   { name: 'Data Import', href: '/dashboard/import', icon: Upload, description: 'CSV & JSON import' },
 ];
 
