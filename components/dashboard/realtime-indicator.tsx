@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, Radio } from 'lucide-react';
 
 export function RealTimeIndicator() {
   const [isConnected, setIsConnected] = useState(false);
@@ -39,34 +39,39 @@ export function RealTimeIndicator() {
   }, []);
 
   return (
-    <div className="flex items-center space-x-2">
+    <div className="flex items-center gap-3">
+      {/* Connection Status */}
       <div
         className={cn(
-          'flex items-center space-x-2 rounded-full px-3 py-1.5 text-sm',
-          isConnected ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'
+          'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-300',
+          isConnected
+            ? 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-200/50'
+            : 'bg-gray-100 text-gray-600 border border-gray-200'
         )}
       >
         {isConnected ? (
           <>
-            <span className="relative flex h-2 w-2">
+            <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <Wifi className="h-4 w-4" />
-            <span className="font-medium">Live</span>
+            <Radio className="h-4 w-4" />
+            <span>Live Streaming</span>
           </>
         ) : (
           <>
             <WifiOff className="h-4 w-4" />
-            <span className="font-medium">Offline</span>
+            <span>Reconnecting...</span>
           </>
         )}
       </div>
+
+      {/* Last Update Time */}
       {lastUpdate && (
-        <span className="text-xs text-gray-400 flex items-center">
-          <RefreshCw className="h-3 w-3 mr-1" />
-          {lastUpdate.toLocaleTimeString()}
-        </span>
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          <RefreshCw className="h-3.5 w-3.5" />
+          <span className="tabular-nums">{lastUpdate.toLocaleTimeString()}</span>
+        </div>
       )}
     </div>
   );

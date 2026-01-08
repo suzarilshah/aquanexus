@@ -1,13 +1,23 @@
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { devices, fishReadings, plantReadings, alerts } from '@/lib/db/schema';
 import { eq, desc, and, gte, count } from 'drizzle-orm';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardStats } from '@/components/dashboard/stats';
 import { DeviceList } from '@/components/dashboard/device-list';
 import { RecentAlerts } from '@/components/dashboard/recent-alerts';
 import { RealTimeIndicator } from '@/components/dashboard/realtime-indicator';
+import {
+  Plus,
+  Fish,
+  Leaf,
+  Brain,
+  ArrowRight,
+  Activity,
+  Bell,
+  Sparkles
+} from 'lucide-react';
 
 async function getStats(userId: string) {
   const userDevices = await db
@@ -23,14 +33,12 @@ async function getStats(userId: string) {
     .where(
       and(
         eq(alerts.resolved, false),
-        // Filter to only this user's devices
       )
     );
 
   const now = new Date();
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  // Get data points count (simplified)
   const fishDataCount = await db
     .select({ count: count() })
     .from(fishReadings)
@@ -51,7 +59,6 @@ async function getStats(userId: string) {
 }
 
 async function getRecentAlerts(userId: string) {
-  // Get user's device IDs first
   const userDevices = await db
     .select({ id: devices.id })
     .from(devices)
@@ -70,6 +77,41 @@ async function getRecentAlerts(userId: string) {
   return recentAlerts;
 }
 
+const quickActions = [
+  {
+    name: 'Add Device',
+    description: 'Register new ESP32',
+    href: '/dashboard/devices',
+    icon: Plus,
+    gradient: 'from-[#007CF0] to-[#00DFD8]',
+    bgGradient: 'from-blue-50 to-cyan-50',
+  },
+  {
+    name: 'Fish Monitor',
+    description: 'View fish tank metrics',
+    href: '/dashboard/fish',
+    icon: Fish,
+    gradient: 'from-cyan-400 to-blue-500',
+    bgGradient: 'from-cyan-50 to-blue-50',
+  },
+  {
+    name: 'Plant Monitor',
+    description: 'Track plant growth',
+    href: '/dashboard/plants',
+    icon: Leaf,
+    gradient: 'from-emerald-400 to-teal-500',
+    bgGradient: 'from-emerald-50 to-teal-50',
+  },
+  {
+    name: 'AI Analysis',
+    description: 'Get AI insights',
+    href: '/dashboard/ai',
+    icon: Brain,
+    gradient: 'from-[#7928CA] to-[#FF0080]',
+    bgGradient: 'from-purple-50 to-pink-50',
+  },
+];
+
 export default async function DashboardPage() {
   const session = await getSession();
 
@@ -81,20 +123,34 @@ export default async function DashboardPage() {
   const recentAlerts = await getRecentAlerts(session.userId);
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">
+    <div className="space-y-8">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-200/50">
+              <Activity className="h-3 w-3 mr-1" />
+              Live
+            </span>
+          </div>
+          <p className="text-gray-500">
             Real-time overview of your aquaponics systems
           </p>
         </div>
         <RealTimeIndicator />
       </div>
 
-      {/* Stats cards */}
-      <Suspense fallback={<div className="h-32 animate-pulse bg-gray-100 rounded-lg" />}>
+      {/* Stats Cards */}
+      <Suspense
+        fallback={
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-36 animate-pulse bg-gray-100 rounded-2xl" />
+            ))}
+          </div>
+        }
+      >
         <DashboardStats
           totalDevices={stats.totalDevices}
           onlineDevices={stats.onlineDevices}
@@ -103,89 +159,122 @@ export default async function DashboardPage() {
         />
       </Suspense>
 
-      {/* Main content grid */}
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Device list */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-medium">Active Devices</CardTitle>
-            <CardDescription>Your registered monitoring devices</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<div className="h-48 animate-pulse bg-gray-100 rounded" />}>
+        {/* Active Devices Card */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Active Devices</h2>
+                <p className="text-sm text-gray-500">Your registered monitoring devices</p>
+              </div>
+              <Link
+                href="/dashboard/devices"
+                className="flex items-center gap-1 text-sm font-medium text-[#007CF0] hover:text-[#0066CC] transition-colors"
+              >
+                View all
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <Suspense fallback={<div className="h-48 animate-pulse bg-gray-100 rounded-xl" />}>
               <DeviceList devices={stats.devices} />
             </Suspense>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Recent alerts */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-medium">Recent Alerts</CardTitle>
-            <CardDescription>Latest system notifications</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<div className="h-48 animate-pulse bg-gray-100 rounded" />}>
+        {/* Recent Alerts Card */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/25">
+                  <Bell className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Recent Alerts</h2>
+                  <p className="text-sm text-gray-500">Latest system notifications</p>
+                </div>
+              </div>
+              {Number(stats.alertCount) > 0 && (
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                  {stats.alertCount}
+                </span>
+              )}
+            </div>
+            <Suspense fallback={<div className="h-48 animate-pulse bg-gray-100 rounded-xl" />}>
               <RecentAlerts alerts={recentAlerts} />
             </Suspense>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      {/* Quick actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-medium">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <a
-              href="/dashboard/devices"
-              className="flex flex-col items-center justify-center rounded-lg border border-gray-200 p-4 text-center hover:bg-gray-50 transition-colors"
+      {/* Quick Actions */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-[#7928CA]" />
+          <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {quickActions.map((action, index) => (
+            <Link
+              key={action.name}
+              href={action.href}
+              className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 p-5 shadow-sm hover:shadow-lg transition-all duration-300"
+              style={{ animationDelay: `${index * 100}ms` }}
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600 mb-2">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
+              {/* Gradient background on hover */}
+              <div className={`absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${action.bgGradient}`} />
+
+              {/* Content */}
+              <div className="relative flex flex-col items-center text-center space-y-3">
+                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${action.gradient} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  <action.icon className="h-7 w-7" />
+                </div>
+                <div>
+                  <span className="block text-sm font-semibold text-gray-900 group-hover:text-gray-900">
+                    {action.name}
+                  </span>
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    {action.description}
+                  </span>
+                </div>
               </div>
-              <span className="text-sm font-medium text-gray-900">Add Device</span>
-            </a>
-            <a
-              href="/dashboard/fish"
-              className="flex flex-col items-center justify-center rounded-lg border border-gray-200 p-4 text-center hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-100 text-cyan-600 mb-2">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
+
+              {/* Arrow on hover */}
+              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                <ArrowRight className="h-4 w-4 text-gray-400" />
               </div>
-              <span className="text-sm font-medium text-gray-900">Fish Monitor</span>
-            </a>
-            <a
-              href="/dashboard/plants"
-              className="flex flex-col items-center justify-center rounded-lg border border-gray-200 p-4 text-center hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600 mb-2">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                </svg>
-              </div>
-              <span className="text-sm font-medium text-gray-900">Plant Monitor</span>
-            </a>
-            <a
-              href="/dashboard/ai"
-              className="flex flex-col items-center justify-center rounded-lg border border-gray-200 p-4 text-center hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-purple-600 mb-2">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <span className="text-sm font-medium text-gray-900">AI Analysis</span>
-            </a>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* AI Insights Banner */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#0F172A] p-8 text-white">
+        {/* Animated gradient orbs */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#007CF0]/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#7928CA]/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+
+        <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Brain className="h-6 w-6 text-[#00DFD8]" />
+              <h3 className="text-xl font-bold">Dual AI Consensus Engine</h3>
+            </div>
+            <p className="text-white/70 max-w-md">
+              Get intelligent analysis from two AI models working together to provide accurate insights about your aquaponics system.
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <Link
+            href="/dashboard/ai"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-gray-900 font-semibold hover:bg-gray-100 transition-colors group"
+          >
+            Try AI Analysis
+            <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
