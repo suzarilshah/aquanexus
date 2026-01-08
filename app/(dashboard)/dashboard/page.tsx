@@ -14,7 +14,6 @@ import {
   Leaf,
   Brain,
   ArrowRight,
-  Activity,
   Bell,
   Sparkles
 } from 'lucide-react';
@@ -127,18 +126,15 @@ export default async function DashboardPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-200/50">
-              <Activity className="h-3 w-3 mr-1" />
-              Live
-            </span>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
           <p className="text-gray-500">
             Real-time overview of your aquaponics systems
           </p>
         </div>
-        <RealTimeIndicator />
+        <RealTimeIndicator
+          totalDevices={stats.totalDevices}
+          onlineDevices={stats.onlineDevices}
+        />
       </div>
 
       {/* Stats Cards */}

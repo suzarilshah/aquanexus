@@ -14,7 +14,19 @@ import {
   ChevronRight,
   Zap,
   CircuitBoard,
+  AlertTriangle,
+  WifiOff,
 } from 'lucide-react';
+
+interface SystemStatus {
+  totalDevices: number;
+  onlineDevices: number;
+  offlineDevices: number;
+}
+
+interface SidebarProps {
+  systemStatus: SystemStatus;
+}
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, description: 'Overview & analytics' },
@@ -30,8 +42,75 @@ const bottomNavigation = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings, description: 'Preferences' },
 ];
 
-export function Sidebar() {
+function getStatusConfig(systemStatus: SystemStatus) {
+  const { totalDevices, onlineDevices, offlineDevices } = systemStatus;
+
+  // No devices registered
+  if (totalDevices === 0) {
+    return {
+      status: 'no-devices',
+      title: 'No Devices',
+      message: 'Register your first device',
+      bgGradient: 'from-gray-50 to-slate-50',
+      borderColor: 'border-gray-200',
+      iconBg: 'bg-gray-400/10',
+      iconColor: 'text-gray-500',
+      dotColor: 'bg-gray-400',
+      showPing: false,
+      Icon: WifiOff,
+    };
+  }
+
+  // All devices offline
+  if (onlineDevices === 0) {
+    return {
+      status: 'all-offline',
+      title: 'All Offline',
+      message: `${totalDevices} device${totalDevices > 1 ? 's' : ''} disconnected`,
+      bgGradient: 'from-red-50 to-orange-50',
+      borderColor: 'border-red-200',
+      iconBg: 'bg-red-500/10',
+      iconColor: 'text-red-600',
+      dotColor: 'bg-red-500',
+      showPing: false,
+      Icon: AlertTriangle,
+    };
+  }
+
+  // Some devices offline
+  if (offlineDevices > 0) {
+    return {
+      status: 'partial',
+      title: 'Partial Outage',
+      message: `${offlineDevices} of ${totalDevices} offline`,
+      bgGradient: 'from-amber-50 to-yellow-50',
+      borderColor: 'border-amber-200',
+      iconBg: 'bg-amber-500/10',
+      iconColor: 'text-amber-600',
+      dotColor: 'bg-amber-500',
+      showPing: true,
+      Icon: AlertTriangle,
+    };
+  }
+
+  // All devices online
+  return {
+    status: 'operational',
+    title: 'All Operational',
+    message: `${totalDevices} device${totalDevices > 1 ? 's' : ''} connected`,
+    bgGradient: 'from-emerald-50 to-teal-50',
+    borderColor: 'border-emerald-100',
+    iconBg: 'bg-emerald-500/10',
+    iconColor: 'text-emerald-600',
+    dotColor: 'bg-emerald-500',
+    showPing: true,
+    Icon: Zap,
+  };
+}
+
+export function Sidebar({ systemStatus }: SidebarProps) {
   const pathname = usePathname();
+  const statusConfig = getStatusConfig(systemStatus);
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
@@ -135,21 +214,27 @@ export function Sidebar() {
 
             {/* Bottom Navigation */}
             <li className="mt-auto">
-              {/* Status Card */}
-              <div className="mb-4 p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100">
+              {/* Dynamic Status Card */}
+              <div className={cn(
+                'mb-4 p-4 rounded-xl bg-gradient-to-br border',
+                statusConfig.bgGradient,
+                statusConfig.borderColor
+              )}>
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                    <Zap className="h-4 w-4 text-emerald-600" />
+                  <div className={cn('h-8 w-8 rounded-lg flex items-center justify-center', statusConfig.iconBg)}>
+                    <statusConfig.Icon className={cn('h-4 w-4', statusConfig.iconColor)} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">System Status</span>
-                      <span className="flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      <span className="text-sm font-medium text-gray-900">{statusConfig.title}</span>
+                      <span className="relative flex h-2 w-2">
+                        {statusConfig.showPing && (
+                          <span className={cn('animate-ping absolute inline-flex h-2 w-2 rounded-full opacity-75', statusConfig.dotColor)} />
+                        )}
+                        <span className={cn('relative inline-flex rounded-full h-2 w-2', statusConfig.dotColor)} />
                       </span>
                     </div>
-                    <span className="text-xs text-gray-500">All systems operational</span>
+                    <span className="text-xs text-gray-500">{statusConfig.message}</span>
                   </div>
                 </div>
               </div>
