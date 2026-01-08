@@ -306,41 +306,75 @@ export function BoardVisualizer({
         <Popover.Trigger asChild>
           <div
             className={cn(
-              'flex items-center gap-2 py-1.5 px-2 rounded-md transition-all',
+              'flex items-center gap-2 py-1 px-2 rounded transition-all',
               side === 'left' ? 'flex-row' : 'flex-row-reverse',
               !isPowerOrGnd && 'cursor-pointer',
-              (isHovered || isSelected) && 'bg-slate-700/50',
+              (isHovered || isSelected) && 'bg-black/20',
               !isHighlighted && highlightedCategory && 'opacity-30'
             )}
             onMouseEnter={() => setHoveredPin(pin.id)}
             onMouseLeave={() => setHoveredPin(null)}
             onClick={() => handlePinClick(pin)}
           >
-            {/* Pin label */}
-            <span className={cn(
-              'text-xs font-mono w-16',
-              side === 'left' ? 'text-right' : 'text-left',
-              (isHovered || isSelected) ? 'text-white font-medium' : 'text-slate-400'
-            )}>
+            {/* Pin label - Silkscreen style */}
+            <span
+              className={cn(
+                'text-[10px] font-mono w-16 font-bold tracking-wide',
+                side === 'left' ? 'text-right' : 'text-left',
+              )}
+              style={{
+                color: (isHovered || isSelected) ? '#ffffff' : '#f0f0e8',
+                textShadow: (isHovered || isSelected)
+                  ? '0 0 4px rgba(255,255,255,0.5)'
+                  : '0 0 1px rgba(0,0,0,0.3)',
+              }}
+            >
               {pin.name}
             </span>
 
             {/* Pin number */}
-            <span className="text-xs font-mono w-6 text-center text-slate-500">
+            <span
+              className="text-[9px] font-mono w-5 text-center font-bold"
+              style={{ color: '#c0e0c0' }}
+            >
               {index + 1}
             </span>
 
-            {/* Pin dot */}
+            {/* Pin dot - Copper pad with realistic styling */}
             <div
               className={cn(
-                'w-3 h-3 rounded-full transition-all flex-shrink-0 relative',
-                (isHovered || isSelected) && 'ring-2 ring-offset-1 ring-offset-slate-800 ring-white/50 scale-125'
+                'w-4 h-4 rounded-full transition-all flex-shrink-0 relative',
+                (isHovered || isSelected) && 'scale-125'
               )}
-              style={{ backgroundColor: getPinColor(pin) }}
+              style={{
+                background: assignment
+                  ? `radial-gradient(circle at 30% 30%, ${getPinColor(pin)}dd, ${getPinColor(pin)})`
+                  : `radial-gradient(circle at 30% 30%, #e8d068, #c9a227, #a08020)`,
+                boxShadow: (isHovered || isSelected)
+                  ? '0 0 8px rgba(201,162,39,0.6), inset 0 1px 2px rgba(255,255,255,0.3)'
+                  : 'inset 0 1px 2px rgba(255,255,255,0.2), inset 0 -1px 1px rgba(0,0,0,0.2)',
+                border: '1px solid rgba(0,0,0,0.2)',
+              }}
             >
+              {/* Through-hole illusion */}
+              <div
+                className="absolute inset-1 rounded-full"
+                style={{
+                  background: assignment
+                    ? 'radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 60%)'
+                    : 'radial-gradient(circle, #1a1a1a 40%, #2d2d2d 100%)',
+                  boxShadow: assignment ? 'none' : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                }}
+              />
               {assignment && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{
+                      background: 'radial-gradient(circle at 30% 30%, #ffffff, #e0e0e0)',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -421,38 +455,192 @@ export function BoardVisualizer({
             </div>
           </div>
 
-          {/* Pinout diagram - clean modern style */}
+          {/* Pinout diagram - Realistic PCB style */}
           <div className="p-6">
-            <div className="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-xl p-4 mx-auto shadow-lg border border-slate-700">
-              {/* USB Connector */}
-              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 h-4 bg-gray-600 rounded-t-sm border-2 border-gray-500 shadow-md" />
+            {/* SVG Definitions for realistic PCB patterns */}
+            <svg width="0" height="0" className="absolute">
+              <defs>
+                {/* Circuit trace pattern */}
+                <pattern id="pcbTracePattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <rect width="40" height="40" fill="transparent" />
+                  <path d="M0 20h15M25 20h15M20 0v15M20 25v15" stroke="#006838" strokeWidth="0.5" opacity="0.3" />
+                  <circle cx="20" cy="20" r="2" fill="#006838" opacity="0.2" />
+                  <circle cx="0" cy="0" r="1.5" fill="#c9a227" opacity="0.4" />
+                  <circle cx="40" cy="0" r="1.5" fill="#c9a227" opacity="0.4" />
+                  <circle cx="0" cy="40" r="1.5" fill="#c9a227" opacity="0.4" />
+                  <circle cx="40" cy="40" r="1.5" fill="#c9a227" opacity="0.4" />
+                </pattern>
+                {/* Fiberglass texture */}
+                <pattern id="fiberglassTexture" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+                  <rect width="4" height="4" fill="#007a42" />
+                  <rect width="2" height="2" fill="#008c4a" opacity="0.5" />
+                  <rect x="2" y="2" width="2" height="2" fill="#006838" opacity="0.3" />
+                </pattern>
+                {/* Copper pad gradient */}
+                <linearGradient id="copperGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#d4a847" />
+                  <stop offset="50%" stopColor="#c9a227" />
+                  <stop offset="100%" stopColor="#b8860b" />
+                </linearGradient>
+                {/* Silver/HASL finish gradient */}
+                <linearGradient id="haslGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#e8e8e8" />
+                  <stop offset="50%" stopColor="#c0c0c0" />
+                  <stop offset="100%" stopColor="#a8a8a8" />
+                </linearGradient>
+                {/* PCB board gradient */}
+                <linearGradient id="pcbGreenGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#009e52" />
+                  <stop offset="50%" stopColor="#008c4a" />
+                  <stop offset="100%" stopColor="#006838" />
+                </linearGradient>
+                {/* IC chip gradient */}
+                <linearGradient id="icChipGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#2d2d2d" />
+                  <stop offset="50%" stopColor="#1a1a1a" />
+                  <stop offset="100%" stopColor="#0d0d0d" />
+                </linearGradient>
+              </defs>
+            </svg>
+
+            <div
+              className="relative rounded-lg mx-auto overflow-hidden"
+              style={{
+                background: 'linear-gradient(180deg, #009e52 0%, #008c4a 50%, #006838 100%)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+                padding: '16px',
+              }}
+            >
+              {/* PCB texture overlay */}
+              <div
+                className="absolute inset-0 opacity-20 pointer-events-none"
+                style={{
+                  backgroundImage: `
+                    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,80,40,0.1) 2px, rgba(0,80,40,0.1) 4px),
+                    repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,80,40,0.1) 2px, rgba(0,80,40,0.1) 4px)
+                  `,
+                }}
+              />
+
+              {/* Circuit trace decorations */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-30">
+                {/* Horizontal traces */}
+                <line x1="10%" y1="20%" x2="35%" y2="20%" stroke="#c9a227" strokeWidth="1" />
+                <line x1="65%" y1="20%" x2="90%" y2="20%" stroke="#c9a227" strokeWidth="1" />
+                <line x1="10%" y1="80%" x2="35%" y2="80%" stroke="#c9a227" strokeWidth="1" />
+                <line x1="65%" y1="80%" x2="90%" y2="80%" stroke="#c9a227" strokeWidth="1" />
+                {/* Via holes */}
+                <circle cx="35%" cy="20%" r="3" fill="#c9a227" />
+                <circle cx="65%" cy="20%" r="3" fill="#c9a227" />
+                <circle cx="35%" cy="80%" r="3" fill="#c9a227" />
+                <circle cx="65%" cy="80%" r="3" fill="#c9a227" />
+                {/* Small vias */}
+                <circle cx="20%" cy="30%" r="1.5" fill="#c9a227" opacity="0.6" />
+                <circle cx="80%" cy="30%" r="1.5" fill="#c9a227" opacity="0.6" />
+                <circle cx="20%" cy="70%" r="1.5" fill="#c9a227" opacity="0.6" />
+                <circle cx="80%" cy="70%" r="1.5" fill="#c9a227" opacity="0.6" />
+              </svg>
+
+              {/* USB Connector - Realistic metal */}
+              <div
+                className="absolute -top-1 left-1/2 -translate-x-1/2 w-20 h-5 rounded-t-sm"
+                style={{
+                  background: 'linear-gradient(180deg, #a8a8a8 0%, #808080 50%, #606060 100%)',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3)',
+                  border: '1px solid #505050',
+                }}
+              >
+                {/* USB port opening */}
+                <div
+                  className="absolute top-1 left-1/2 -translate-x-1/2 w-14 h-2.5 rounded-sm"
+                  style={{
+                    background: 'linear-gradient(180deg, #1a1a1a 0%, #2d2d2d 100%)',
+                    border: '1px solid #404040',
+                  }}
+                />
+              </div>
 
               {/* Board content */}
-              <div className="flex justify-between gap-4 pt-4">
+              <div className="flex justify-between gap-4 pt-6 relative z-10">
                 {/* Left pins */}
                 <div className="flex flex-col">
                   {leftPins.map((pin, idx) => renderPin(pin, 'left', idx))}
                 </div>
 
-                {/* Center - Chip representation */}
-                <div className="flex flex-col items-center justify-center min-w-[140px]">
-                  <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 shadow-inner">
-                    <div className="text-center">
-                      <div className="w-24 h-24 bg-slate-900 rounded-md border border-slate-600 flex items-center justify-center mb-2 shadow-inner">
-                        <div className="text-[10px] text-slate-400 font-mono text-center">
-                          <div className="font-semibold text-slate-300">{board.microcontroller.split('-')[0]}</div>
-                          <div className="mt-1">{board.microcontroller.split('-').slice(1).join('-')}</div>
-                        </div>
+                {/* Center - IC Chip with realistic styling */}
+                <div className="flex flex-col items-center justify-center min-w-[160px]">
+                  {/* Metal shield/can (for WiFi module) */}
+                  <div
+                    className="rounded-md p-1 mb-2"
+                    style={{
+                      background: 'linear-gradient(135deg, #c0c0c0 0%, #909090 50%, #707070 100%)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.4)',
+                    }}
+                  >
+                    <div
+                      className="w-28 h-16 rounded-sm flex items-center justify-center"
+                      style={{
+                        background: 'linear-gradient(180deg, #a0a0a0 0%, #808080 100%)',
+                        border: '1px solid #606060',
+                      }}
+                    >
+                      {/* Ventilation holes pattern */}
+                      <div className="grid grid-cols-5 gap-1">
+                        {[...Array(10)].map((_, i) => (
+                          <div key={i} className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                        ))}
                       </div>
-                      <div className="text-[10px] text-slate-500 font-mono">{board.name}</div>
-                      <div className="text-[8px] text-slate-600 font-mono mt-0.5">Rev 1.0</div>
                     </div>
                   </div>
 
-                  {/* USB label */}
-                  <div className="mt-auto pt-4 flex items-center gap-1 text-slate-500">
+                  {/* Main IC Chip */}
+                  <div
+                    className="rounded-sm relative"
+                    style={{
+                      background: 'linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 50%, #0d0d0d 100%)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
+                      padding: '8px 12px',
+                    }}
+                  >
+                    {/* Chip notch/orientation mark */}
+                    <div
+                      className="absolute top-1 left-2 w-2 h-2 rounded-full"
+                      style={{ background: 'radial-gradient(circle, #404040 0%, #1a1a1a 100%)' }}
+                    />
+
+                    {/* Chip label - silkscreen style */}
+                    <div className="text-center py-2">
+                      <div
+                        className="text-[11px] font-bold font-mono tracking-wider"
+                        style={{ color: '#e0e0e0', textShadow: '0 1px 1px rgba(0,0,0,0.5)' }}
+                      >
+                        {board.microcontroller.split('-')[0]}
+                      </div>
+                      <div
+                        className="text-[9px] font-mono mt-0.5"
+                        style={{ color: '#a0a0a0' }}
+                      >
+                        {board.microcontroller.split('-').slice(1).join('-') || 'WROOM-32'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Board silkscreen label */}
+                  <div
+                    className="mt-3 text-center"
+                    style={{
+                      color: '#f0f0e8',
+                      textShadow: '0 0 2px rgba(240,240,232,0.3)',
+                    }}
+                  >
+                    <div className="text-[10px] font-mono font-bold tracking-wide">{board.name}</div>
+                    <div className="text-[8px] font-mono opacity-70 mt-0.5">Rev 1.0</div>
+                  </div>
+
+                  {/* USB label - silkscreen style */}
+                  <div className="mt-auto pt-3 flex items-center gap-1.5" style={{ color: '#f0f0e8' }}>
                     <Usb className="w-3 h-3" />
-                    <span className="text-[10px] font-mono">USB</span>
+                    <span className="text-[9px] font-mono font-bold tracking-wider">USB</span>
                   </div>
                 </div>
 
@@ -461,6 +649,14 @@ export function BoardVisualizer({
                   {rightPins.map((pin, idx) => renderPin(pin, 'right', idx))}
                 </div>
               </div>
+
+              {/* Bottom edge - PCB thickness illusion */}
+              <div
+                className="absolute bottom-0 left-0 right-0 h-1"
+                style={{
+                  background: 'linear-gradient(180deg, #005030 0%, #003820 100%)',
+                }}
+              />
             </div>
           </div>
 
