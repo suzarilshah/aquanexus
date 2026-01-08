@@ -172,11 +172,12 @@ export default function SettingsPage() {
       const endpoint = modelNumber === 1 ? config.model1Endpoint : config.model2Endpoint;
       const apiKey = modelNumber === 1 ? config.model1ApiKey : config.model2ApiKey;
       const apiVersion = modelNumber === 1 ? config.model1ApiVersion : config.model2ApiVersion;
+      const modelName = modelNumber === 1 ? config.model1Name : config.model2Name;
 
       const res = await fetch('/api/ai/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelNumber, endpoint, apiKey, apiVersion }),
+        body: JSON.stringify({ modelNumber, modelName, endpoint, apiKey, apiVersion }),
       });
 
       const data = await res.json();

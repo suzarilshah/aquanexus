@@ -48,6 +48,7 @@ export async function callAIModel(
         'Authorization': `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify({
+        model: config.name, // Required for OpenAI-compatible endpoints like DeepSeek
         messages: [
           {
             role: 'system',
@@ -234,6 +235,7 @@ export async function testAIConnection(config: AIModelConfig): Promise<AIConnect
         'Authorization': `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify({
+        model: config.name, // Required for OpenAI-compatible endpoints like DeepSeek
         messages: [
           { role: 'user', content: 'Hello, respond with "OK" only.' },
         ],

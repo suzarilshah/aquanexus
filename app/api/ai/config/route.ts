@@ -140,7 +140,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { modelNumber, endpoint, apiKey, apiVersion } = await request.json();
+    const { modelNumber, modelName, endpoint, apiKey, apiVersion } = await request.json();
 
     if (!modelNumber || !endpoint || !apiKey) {
       return NextResponse.json(
@@ -151,7 +151,7 @@ export async function PUT(request: Request) {
 
     // Test the connection with detailed error logging
     const result = await testAIConnection({
-      name: `Model ${modelNumber}`,
+      name: modelName || `Model ${modelNumber}`,
       endpoint,
       apiKey,
       apiVersion,
