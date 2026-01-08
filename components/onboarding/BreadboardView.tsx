@@ -1,9 +1,29 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  Panel,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Connection,
+  Edge,
+  Node,
+  NodeTypes,
+  Handle,
+  Position,
+  MarkerType,
+  BackgroundVariant,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { cn } from '@/lib/utils';
 import type { PinAssignment } from './BoardVisualizer';
-import type { BoardDefinition } from '@/data/boards';
+import type { BoardDefinition, PinDefinition } from '@/data/boards';
+import type { SensorDefinition } from '@/data/sensors';
 import {
   Thermometer,
   Droplets,
@@ -20,6 +40,11 @@ import {
   Monitor,
   Radio,
   Info,
+  Cpu,
+  Zap,
+  GripVertical,
+  Trash2,
+  Settings,
 } from 'lucide-react';
 
 const ICONS: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -39,285 +64,677 @@ const ICONS: Record<string, React.ComponentType<{ className?: string; style?: Re
   Radio,
 };
 
+// Custom Node: ESP32 Microcontroller Board
+interface BoardNodeData extends Record<string, unknown> {
+  board: BoardDefinition;
+  label: string;
+  leftPins: PinDefinition[];
+  rightPins: PinDefinition[];
+}
+
+function BoardNode({ data, selected }: { data: BoardNodeData; selected: boolean }) {
+  return (
+    <div
+      className={cn(
+        'relative rounded-lg overflow-hidden transition-all',
+        selected && 'ring-2 ring-blue-500 ring-offset-2'
+      )}
+      style={{
+        background: 'linear-gradient(180deg, #009e52 0%, #008c4a 50%, #006838 100%)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        padding: '12px 8px',
+        minWidth: '280px',
+      }}
+    >
+      {/* PCB texture overlay */}
+      <div
+        className="absolute inset-0 opacity-10 pointer-events-none"
+        style={{
+          backgroundImage: `
+            repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,80,40,0.2) 2px, rgba(0,80,40,0.2) 4px),
+            repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,80,40,0.2) 2px, rgba(0,80,40,0.2) 4px)
+          `,
+        }}
+      />
+
+      {/* USB Connector */}
+      <div
+        className="absolute -top-1 left-1/2 -translate-x-1/2 w-16 h-4 rounded-t-sm"
+        style={{
+          background: 'linear-gradient(180deg, #a8a8a8 0%, #808080 50%, #606060 100%)',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
+        }}
+      >
+        <div
+          className="absolute top-1 left-1/2 -translate-x-1/2 w-12 h-2 rounded-sm"
+          style={{ background: '#1a1a1a' }}
+        />
+      </div>
+
+      {/* Board Content */}
+      <div className="flex items-stretch pt-4">
+        {/* Left Pins */}
+        <div className="flex flex-col gap-1">
+          {data.leftPins.map((pin, idx) => (
+            <div key={pin.id} className="flex items-center gap-1 relative">
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={`left-${pin.id}`}
+                style={{
+                  background: '#c9a227',
+                  border: '2px solid #a08020',
+                  width: 12,
+                  height: 12,
+                  left: -6,
+                }}
+              />
+              <span
+                className="text-[9px] font-mono font-bold w-14 text-right pr-1"
+                style={{ color: '#f0f0e8', textShadow: '0 0 2px rgba(0,0,0,0.5)' }}
+              >
+                {pin.name}
+              </span>
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{
+                  background: 'radial-gradient(circle at 30% 30%, #e8d068, #c9a227)',
+                  boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.3)',
+                }}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Center - Chip */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4">
+          {/* WiFi Module */}
+          <div
+            className="rounded-sm p-1 mb-2"
+            style={{
+              background: 'linear-gradient(135deg, #c0c0c0 0%, #909090 100%)',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            }}
+          >
+            <div
+              className="w-16 h-10 rounded-sm flex items-center justify-center"
+              style={{ background: '#808080' }}
+            >
+              <div className="grid grid-cols-3 gap-0.5">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="w-1 h-1 rounded-full bg-gray-600" />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Main IC */}
+          <div
+            className="rounded-sm relative px-3 py-2"
+            style={{
+              background: 'linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%)',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div
+              className="absolute top-1 left-1 w-1.5 h-1.5 rounded-full"
+              style={{ background: '#404040' }}
+            />
+            <div className="text-center">
+              <div className="text-[10px] font-bold font-mono" style={{ color: '#e0e0e0' }}>
+                {data.board.microcontroller.split('-')[0]}
+              </div>
+              <div className="text-[8px] font-mono" style={{ color: '#808080' }}>
+                {data.board.microcontroller.split('-').slice(1).join('-') || 'WROOM'}
+              </div>
+            </div>
+          </div>
+
+          {/* Board Label */}
+          <div className="mt-2 text-center" style={{ color: '#f0f0e8' }}>
+            <div className="text-[9px] font-mono font-bold">{data.board.name}</div>
+          </div>
+        </div>
+
+        {/* Right Pins */}
+        <div className="flex flex-col gap-1">
+          {data.rightPins.map((pin, idx) => (
+            <div key={pin.id} className="flex items-center gap-1 relative">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{
+                  background: 'radial-gradient(circle at 30% 30%, #e8d068, #c9a227)',
+                  boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.3)',
+                }}
+              />
+              <span
+                className="text-[9px] font-mono font-bold w-14 text-left pl-1"
+                style={{ color: '#f0f0e8', textShadow: '0 0 2px rgba(0,0,0,0.5)' }}
+              >
+                {pin.name}
+              </span>
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={`right-${pin.id}`}
+                style={{
+                  background: '#c9a227',
+                  border: '2px solid #a08020',
+                  width: 12,
+                  height: 12,
+                  right: -6,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Drag handle indicator */}
+      <div className="absolute top-2 right-2 opacity-50">
+        <GripVertical className="w-4 h-4 text-white" />
+      </div>
+    </div>
+  );
+}
+
+// Custom Node: Sensor Module
+interface SensorNodeData extends Record<string, unknown> {
+  sensor: SensorDefinition;
+  assignment: PinAssignment;
+  onDelete?: () => void;
+}
+
+function SensorNode({ data, selected }: { data: SensorNodeData; selected: boolean }) {
+  const SensorIcon = ICONS[data.sensor.icon] || Info;
+
+  return (
+    <div
+      className={cn(
+        'relative rounded-xl overflow-hidden transition-all',
+        selected && 'ring-2 ring-offset-2'
+      )}
+      style={{
+        background: `linear-gradient(135deg, ${data.sensor.color}15, ${data.sensor.color}08)`,
+        border: `2px solid ${data.sensor.color}40`,
+        boxShadow: selected
+          ? `0 8px 24px ${data.sensor.color}30, 0 0 0 2px ${data.sensor.color}`
+          : '0 4px 12px rgba(0,0,0,0.1)',
+        padding: '12px',
+        minWidth: '120px',
+      }}
+    >
+      {/* Connection Handle */}
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="sensor-out"
+        style={{
+          background: data.sensor.color,
+          border: `2px solid ${data.sensor.color}`,
+          width: 10,
+          height: 10,
+          left: -5,
+        }}
+      />
+
+      {/* Delete button */}
+      {data.onDelete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onDelete?.();
+          }}
+          className="absolute top-1 right-1 p-1 rounded-full hover:bg-red-100 transition-colors group"
+        >
+          <Trash2 className="w-3 h-3 text-gray-400 group-hover:text-red-500" />
+        </button>
+      )}
+
+      {/* Sensor Content */}
+      <div className="flex flex-col items-center gap-2">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center"
+          style={{ background: `${data.sensor.color}20` }}
+        >
+          <SensorIcon className="w-5 h-5" style={{ color: data.sensor.color }} />
+        </div>
+        <div className="text-center">
+          <div className="text-xs font-semibold text-gray-800">{data.sensor.name}</div>
+          <div className="text-[10px] text-gray-500">
+            GPIO {data.assignment.gpio}
+          </div>
+        </div>
+      </div>
+
+      {/* Pin indicators */}
+      <div className="mt-2 flex flex-wrap gap-1 justify-center">
+        {data.sensor.pins.map((pin) => (
+          <span
+            key={pin.name}
+            className="text-[8px] px-1.5 py-0.5 rounded-full"
+            style={{
+              background: `${data.sensor.color}15`,
+              color: data.sensor.color,
+            }}
+          >
+            {pin.name}
+          </span>
+        ))}
+      </div>
+
+      {/* Drag handle */}
+      <div className="absolute bottom-1 right-1 opacity-40">
+        <GripVertical className="w-3 h-3 text-gray-500" />
+      </div>
+    </div>
+  );
+}
+
+// Custom Node: Power Rail
+interface PowerRailNodeData extends Record<string, unknown> {
+  type: 'power' | 'ground';
+  voltage?: number;
+}
+
+function PowerRailNode({ data, selected }: { data: PowerRailNodeData; selected: boolean }) {
+  const isPower = data.type === 'power';
+
+  return (
+    <div
+      className={cn(
+        'relative rounded-lg overflow-hidden transition-all',
+        selected && 'ring-2 ring-offset-2',
+        isPower ? 'ring-red-500' : 'ring-blue-500'
+      )}
+      style={{
+        background: isPower
+          ? 'linear-gradient(90deg, #fee2e2, #fecaca)'
+          : 'linear-gradient(90deg, #dbeafe, #bfdbfe)',
+        border: `2px solid ${isPower ? '#fca5a5' : '#93c5fd'}`,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        padding: '8px 24px',
+        minWidth: '200px',
+      }}
+    >
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="power-in"
+        style={{
+          background: isPower ? '#ef4444' : '#3b82f6',
+          border: '2px solid white',
+          width: 10,
+          height: 10,
+        }}
+      />
+
+      <div className="flex items-center justify-center gap-2">
+        {isPower ? (
+          <Zap className="w-4 h-4 text-red-500" />
+        ) : (
+          <div className="w-4 h-4 flex items-center justify-center text-blue-500 font-bold text-xs">⏚</div>
+        )}
+        <span
+          className={cn(
+            'text-sm font-bold',
+            isPower ? 'text-red-600' : 'text-blue-600'
+          )}
+        >
+          {isPower ? `${data.voltage || 3.3}V` : 'GND'}
+        </span>
+      </div>
+
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="power-out"
+        style={{
+          background: isPower ? '#ef4444' : '#3b82f6',
+          border: '2px solid white',
+          width: 10,
+          height: 10,
+        }}
+      />
+    </div>
+  );
+}
+
+// Custom Node: Breadboard
+function BreadboardNode({ selected }: { selected: boolean }) {
+  return (
+    <div
+      className={cn(
+        'relative rounded-lg overflow-hidden transition-all',
+        selected && 'ring-2 ring-gray-400 ring-offset-2'
+      )}
+      style={{
+        background: 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)',
+        border: '2px solid #cbd5e1',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+        padding: '16px',
+        width: '500px',
+        height: '280px',
+      }}
+    >
+      {/* Power rails - top */}
+      <div className="flex gap-2 mb-3">
+        <div
+          className="flex-1 h-6 rounded-sm flex items-center"
+          style={{ background: '#fee2e2', border: '1px solid #fca5a5' }}
+        >
+          <div className="w-full h-0.5 bg-red-400 mx-2" />
+        </div>
+        <div
+          className="flex-1 h-6 rounded-sm flex items-center"
+          style={{ background: '#dbeafe', border: '1px solid #93c5fd' }}
+        >
+          <div className="w-full h-0.5 bg-blue-400 mx-2" />
+        </div>
+      </div>
+
+      {/* Main breadboard area */}
+      <div className="bg-gray-100 rounded-sm p-3 border border-gray-200">
+        {/* Holes pattern - top section */}
+        <div className="grid grid-cols-30 gap-1 mb-2">
+          {[...Array(150)].map((_, i) => (
+            <div key={`top-${i}`} className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+          ))}
+        </div>
+
+        {/* Center gap */}
+        <div className="h-3 bg-gray-200 rounded-sm my-2" />
+
+        {/* Holes pattern - bottom section */}
+        <div className="grid grid-cols-30 gap-1">
+          {[...Array(150)].map((_, i) => (
+            <div key={`bottom-${i}`} className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+          ))}
+        </div>
+      </div>
+
+      {/* Power rails - bottom */}
+      <div className="flex gap-2 mt-3">
+        <div
+          className="flex-1 h-6 rounded-sm flex items-center"
+          style={{ background: '#fee2e2', border: '1px solid #fca5a5' }}
+        >
+          <div className="w-full h-0.5 bg-red-400 mx-2" />
+        </div>
+        <div
+          className="flex-1 h-6 rounded-sm flex items-center"
+          style={{ background: '#dbeafe', border: '1px solid #93c5fd' }}
+        >
+          <div className="w-full h-0.5 bg-blue-400 mx-2" />
+        </div>
+      </div>
+
+      {/* Label */}
+      <div className="absolute bottom-2 right-2 text-[10px] text-gray-400 font-mono">
+        400-Point Breadboard
+      </div>
+    </div>
+  );
+}
+
+// Define node types
+const nodeTypes: NodeTypes = {
+  board: BoardNode,
+  sensor: SensorNode,
+  powerRail: PowerRailNode,
+  breadboard: BreadboardNode,
+};
+
+// Edge styles for different connection types
+const getEdgeStyle = (type: string) => {
+  switch (type) {
+    case 'power':
+      return { stroke: '#ef4444', strokeWidth: 3 };
+    case 'ground':
+      return { stroke: '#3b82f6', strokeWidth: 3 };
+    case 'signal':
+      return { stroke: '#8b5cf6', strokeWidth: 2 };
+    case 'i2c':
+      return { stroke: '#f97316', strokeWidth: 2 };
+    default:
+      return { stroke: '#64748b', strokeWidth: 2 };
+  }
+};
+
 interface BreadboardViewProps {
   board: BoardDefinition;
   assignments: PinAssignment[];
+  onUnassign?: (pinId: string) => void;
   className?: string;
 }
 
-export function BreadboardView({ board, assignments, className }: BreadboardViewProps) {
-  // Group assignments by sensor (for multi-pin sensors like I2C)
-  const sensorGroups = assignments.reduce((acc, assignment) => {
-    const key = assignment.sensor.id;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(assignment);
-    return acc;
-  }, {} as Record<string, PinAssignment[]>);
+export function BreadboardView({ board, assignments, onUnassign, className }: BreadboardViewProps) {
+  // Group assignments by sensor
+  const sensorGroups = useMemo(() => {
+    return assignments.reduce((acc, assignment) => {
+      const key = assignment.sensor.id;
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(assignment);
+      return acc;
+    }, {} as Record<string, PinAssignment[]>);
+  }, [assignments]);
+
+  // Create initial nodes
+  const initialNodes = useMemo((): Node[] => {
+    const nodes: Node[] = [];
+
+    // Add breadboard as background
+    nodes.push({
+      id: 'breadboard',
+      type: 'breadboard',
+      position: { x: 100, y: 150 },
+      data: {},
+      selectable: false,
+      draggable: false,
+      zIndex: 0,
+    });
+
+    // Add the board
+    const leftPins = board.pins.filter((p) => p.side === 'left').slice(0, 15);
+    const rightPins = board.pins.filter((p) => p.side === 'right').slice(0, 15);
+
+    nodes.push({
+      id: 'esp32-board',
+      type: 'board',
+      position: { x: 200, y: 200 },
+      data: {
+        board,
+        label: board.name,
+        leftPins,
+        rightPins,
+      },
+      zIndex: 10,
+    });
+
+    // Add power rails
+    nodes.push({
+      id: 'power-rail-3v3',
+      type: 'powerRail',
+      position: { x: 520, y: 50 },
+      data: { type: 'power' as const, voltage: 3.3 },
+      zIndex: 5,
+    });
+
+    nodes.push({
+      id: 'power-rail-gnd',
+      type: 'powerRail',
+      position: { x: 520, y: 120 },
+      data: { type: 'ground' as const },
+      zIndex: 5,
+    });
+
+    // Add sensor nodes
+    Object.entries(sensorGroups).forEach(([sensorId, sensorAssignments], index) => {
+      const assignment = sensorAssignments[0];
+      nodes.push({
+        id: `sensor-${sensorId}`,
+        type: 'sensor',
+        position: { x: 550 + (index % 2) * 140, y: 220 + Math.floor(index / 2) * 140 },
+        data: {
+          sensor: assignment.sensor,
+          assignment,
+          onDelete: onUnassign ? () => onUnassign(assignment.pinId) : undefined,
+        },
+        zIndex: 15,
+      });
+    });
+
+    return nodes;
+  }, [board, sensorGroups, onUnassign]);
+
+  // Create initial edges (connections)
+  const initialEdges = useMemo((): Edge[] => {
+    const edges: Edge[] = [];
+
+    // Connect sensors to board pins
+    Object.entries(sensorGroups).forEach(([sensorId, sensorAssignments]) => {
+      sensorAssignments.forEach((assignment, idx) => {
+        const pin = board.pins.find((p) => p.gpio === assignment.gpio);
+        if (!pin) return;
+
+        const sourceHandle = pin.side === 'right' ? `right-${pin.id}` : `left-${pin.id}`;
+
+        edges.push({
+          id: `edge-${sensorId}-${idx}`,
+          source: 'esp32-board',
+          sourceHandle,
+          target: `sensor-${sensorId}`,
+          targetHandle: 'sensor-out',
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: assignment.sensor.color, strokeWidth: 2 },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: assignment.sensor.color,
+          },
+        });
+      });
+    });
+
+    return edges;
+  }, [board.pins, sensorGroups]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Handle new connections
+  const onConnect = useCallback(
+    (params: Connection) => {
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...params,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: '#8b5cf6', strokeWidth: 2 },
+          },
+          eds
+        )
+      );
+    },
+    [setEdges]
+  );
 
   return (
-    <div className={cn('relative', className)}>
-      <svg viewBox="0 0 600 400" className="w-full">
-        {/* Background */}
-        <defs>
-          <pattern id="breadboardHoles" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
-            <circle cx="5" cy="5" r="2" fill="#4b5563" />
-          </pattern>
-          <linearGradient id="breadboardGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#f8fafc" />
-            <stop offset="100%" stopColor="#e2e8f0" />
-          </linearGradient>
-        </defs>
-
-        {/* Breadboard body */}
-        <rect
-          x="20"
-          y="20"
-          width="560"
-          height="360"
-          rx="8"
-          fill="url(#breadboardGradient)"
-          stroke="#cbd5e1"
-          strokeWidth="2"
+    <div className={cn('w-full h-[600px] rounded-2xl overflow-hidden border border-gray-200 bg-white', className)}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.3}
+        maxZoom={2}
+        defaultEdgeOptions={{
+          type: 'smoothstep',
+          animated: true,
+        }}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e2e8f0" />
+        <Controls
+          className="bg-white rounded-lg shadow-lg border border-gray-200"
+          showZoom
+          showFitView
+          showInteractive
+        />
+        <MiniMap
+          nodeColor={(node) => {
+            if (node.type === 'board') return '#008c4a';
+            if (node.type === 'sensor') return (node.data as SensorNodeData).sensor?.color || '#8b5cf6';
+            if (node.type === 'powerRail') {
+              return (node.data as PowerRailNodeData).type === 'power' ? '#ef4444' : '#3b82f6';
+            }
+            return '#e2e8f0';
+          }}
+          maskColor="rgba(0, 0, 0, 0.1)"
+          className="bg-white rounded-lg shadow-lg border border-gray-200"
         />
 
-        {/* Power rails */}
-        <g>
-          {/* Top power rail - 5V (red) */}
-          <rect x="40" y="40" width="520" height="25" rx="4" fill="#fee2e2" stroke="#fca5a5" />
-          <line x1="50" y1="52" x2="550" y2="52" stroke="#ef4444" strokeWidth="2" />
-          <text x="30" y="57" fill="#dc2626" fontSize="10" fontWeight="bold">+</text>
+        {/* Info Panel */}
+        <Panel position="top-left" className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 p-4 m-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+              <Cpu className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Interactive Breadboard</h3>
+              <p className="text-xs text-gray-500">Drag components to arrange your circuit</p>
+            </div>
+          </div>
+        </Panel>
 
-          {/* Top power rail - GND (blue) */}
-          <rect x="40" y="70" width="520" height="25" rx="4" fill="#dbeafe" stroke="#93c5fd" />
-          <line x1="50" y1="82" x2="550" y2="82" stroke="#3b82f6" strokeWidth="2" />
-          <text x="30" y="87" fill="#2563eb" fontSize="10" fontWeight="bold">-</text>
+        {/* Stats Panel */}
+        <Panel position="top-right" className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 p-4 m-4">
+          <div className="flex items-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-emerald-500" />
+              <span className="text-gray-600">Board</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-500" />
+              <span className="text-gray-600">{Object.keys(sensorGroups).length} Sensors</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <span className="text-gray-600">{edges.length} Connections</span>
+            </div>
+          </div>
+        </Panel>
 
-          {/* Bottom power rail - 5V (red) */}
-          <rect x="40" y="305" width="520" height="25" rx="4" fill="#fee2e2" stroke="#fca5a5" />
-          <line x1="50" y1="317" x2="550" y2="317" stroke="#ef4444" strokeWidth="2" />
-          <text x="30" y="322" fill="#dc2626" fontSize="10" fontWeight="bold">+</text>
-
-          {/* Bottom power rail - GND (blue) */}
-          <rect x="40" y="335" width="520" height="25" rx="4" fill="#dbeafe" stroke="#93c5fd" />
-          <line x1="50" y1="347" x2="550" y2="347" stroke="#3b82f6" strokeWidth="2" />
-          <text x="30" y="352" fill="#2563eb" fontSize="10" fontWeight="bold">-</text>
-        </g>
-
-        {/* Main breadboard area */}
-        <rect x="40" y="105" width="520" height="190" rx="4" fill="#f1f5f9" stroke="#cbd5e1" />
-
-        {/* Center divider */}
-        <rect x="40" y="195" width="520" height="10" fill="#e2e8f0" />
-
-        {/* Hole patterns */}
-        <g>
-          {/* Top section holes */}
-          {Array.from({ length: 50 }).map((_, col) =>
-            Array.from({ length: 5 }).map((_, row) => (
-              <circle
-                key={`top-${col}-${row}`}
-                cx={55 + col * 10}
-                cy={120 + row * 15}
-                r="2.5"
-                fill="#374151"
-              />
-            ))
-          )}
-
-          {/* Bottom section holes */}
-          {Array.from({ length: 50 }).map((_, col) =>
-            Array.from({ length: 5 }).map((_, row) => (
-              <circle
-                key={`bottom-${col}-${row}`}
-                cx={55 + col * 10}
-                cy={215 + row * 15}
-                r="2.5"
-                fill="#374151"
-              />
-            ))
-          )}
-        </g>
-
-        {/* ESP32 Board representation */}
-        <g transform="translate(200, 115)">
-          <rect x="0" y="0" width="80" height="170" rx="4" fill="#1e3a5f" stroke="#334155" strokeWidth="2" />
-          <rect x="25" y="-5" width="30" height="15" rx="2" fill="#4b5563" /> {/* USB */}
-          <text x="40" y="85" textAnchor="middle" fill="#9ca3af" fontSize="8" fontFamily="monospace">
-            ESP32
-          </text>
-          <text x="40" y="95" textAnchor="middle" fill="#6b7280" fontSize="6" fontFamily="monospace">
-            DevKit V1
-          </text>
-
-          {/* Pin labels on ESP32 */}
-          {board.pins.filter(p => p.side === 'left').slice(0, 8).map((pin, idx) => (
-            <g key={`left-${pin.id}`}>
-              <circle cx="-5" cy={20 + idx * 18} r="3" fill="#64748b" />
-              <text x="-12" y={23 + idx * 18} textAnchor="end" fill="#94a3b8" fontSize="5">
-                {pin.name}
-              </text>
-            </g>
-          ))}
-
-          {board.pins.filter(p => p.side === 'right').slice(0, 8).map((pin, idx) => (
-            <g key={`right-${pin.id}`}>
-              <circle cx="85" cy={20 + idx * 18} r="3" fill="#64748b" />
-              <text x="92" y={23 + idx * 18} textAnchor="start" fill="#94a3b8" fontSize="5">
-                {pin.name}
-              </text>
-            </g>
-          ))}
-        </g>
-
-        {/* Connected sensors */}
-        {Object.entries(sensorGroups).map(([sensorId, sensorAssignments], groupIdx) => {
-          const sensor = sensorAssignments[0].sensor;
-          const SensorIcon = ICONS[sensor.icon] || Info;
-          const xOffset = 380 + (groupIdx % 2) * 100;
-          const yOffset = 120 + Math.floor(groupIdx / 2) * 80;
-
-          return (
-            <g key={sensorId} transform={`translate(${xOffset}, ${yOffset})`}>
-              {/* Sensor module */}
-              <rect
-                x="0"
-                y="0"
-                width="80"
-                height="60"
-                rx="4"
-                fill={`${sensor.color}15`}
-                stroke={sensor.color}
-                strokeWidth="1.5"
-              />
-
-              {/* Sensor icon */}
-              <foreignObject x="25" y="5" width="30" height="30">
-                <div className="flex items-center justify-center h-full">
-                  <SensorIcon className="h-5 w-5" style={{ color: sensor.color }} />
-                </div>
-              </foreignObject>
-
-              {/* Sensor name */}
-              <text x="40" y="48" textAnchor="middle" fill={sensor.color} fontSize="8" fontWeight="500">
-                {sensor.name}
-              </text>
-
-              {/* Connection wires */}
-              {sensorAssignments.map((assignment, pinIdx) => {
-                const pin = board.pins.find(p => p.gpio === assignment.gpio);
-                if (!pin) return null;
-
-                // Calculate wire path from sensor to ESP32
-                const sensorX = -xOffset + 280 + (pin.side === 'right' ? 85 : -5);
-                const sensorY = -yOffset + 115 + 20;
-
-                return (
-                  <g key={assignment.pinId}>
-                    {/* Wire */}
-                    <path
-                      d={`M 0 ${30 + pinIdx * 10}
-                          C -20 ${30 + pinIdx * 10},
-                            ${sensorX - 20} ${sensorY + pinIdx * 18},
-                            ${sensorX} ${sensorY + pinIdx * 18}`}
-                      fill="none"
-                      stroke={sensor.color}
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      opacity="0.7"
-                    />
-
-                    {/* Pin label */}
-                    <text
-                      x="-5"
-                      y={33 + pinIdx * 10}
-                      textAnchor="end"
-                      fill="#64748b"
-                      fontSize="6"
-                    >
-                      {assignment.sensorPinName}
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
-          );
-        })}
-
-        {/* Power connections */}
-        <g>
-          {/* 3.3V wire */}
-          <path
-            d="M 280 115 L 280 95 L 350 95 L 350 52"
-            fill="none"
-            stroke="#22c55e"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <circle cx="350" cy="52" r="3" fill="#22c55e" />
-          <text x="355" y="45" fill="#22c55e" fontSize="7">3.3V</text>
-
-          {/* GND wire */}
-          <path
-            d="M 280 285 L 280 300 L 400 300 L 400 347"
-            fill="none"
-            stroke="#3b82f6"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <circle cx="400" cy="347" r="3" fill="#3b82f6" />
-          <text x="405" y="355" fill="#3b82f6" fontSize="7">GND</text>
-        </g>
-
-        {/* Labels */}
-        <text x="300" y="15" textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="500">
-          Breadboard Connection Diagram
-        </text>
-
-        {/* Legend */}
-        <g transform="translate(20, 380)">
-          <text x="0" y="0" fill="#64748b" fontSize="8">
-            Legend:
-          </text>
-          <line x1="50" y1="-3" x2="70" y2="-3" stroke="#ef4444" strokeWidth="2" />
-          <text x="75" y="0" fill="#64748b" fontSize="7">5V/3.3V</text>
-          <line x1="110" y1="-3" x2="130" y2="-3" stroke="#3b82f6" strokeWidth="2" />
-          <text x="135" y="0" fill="#64748b" fontSize="7">GND</text>
-          <line x1="165" y1="-3" x2="185" y2="-3" stroke="#8b5cf6" strokeWidth="2" />
-          <text x="190" y="0" fill="#64748b" fontSize="7">Signal</text>
-        </g>
-      </svg>
-
-      {/* Sensor list */}
-      {assignments.length > 0 && (
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2">
-          {Object.entries(sensorGroups).map(([sensorId, sensorAssignments]) => {
-            const sensor = sensorAssignments[0].sensor;
-            const SensorIcon = ICONS[sensor.icon] || Info;
-
-            return (
-              <div
-                key={sensorId}
-                className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100"
-              >
-                <div
-                  className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${sensor.color}15` }}
-                >
-                  <SensorIcon className="h-4 w-4" style={{ color: sensor.color }} />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{sensor.name}</div>
-                  <div className="text-xs text-gray-500">
-                    GPIO {sensorAssignments.map(a => a.gpio).join(', ')}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        {/* Legend Panel */}
+        <Panel position="bottom-left" className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 p-3 m-4">
+          <div className="text-xs font-medium text-gray-500 mb-2">Wire Legend</div>
+          <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-0.5 bg-red-500 rounded" />
+              <span className="text-xs text-gray-600">Power</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-0.5 bg-blue-500 rounded" />
+              <span className="text-xs text-gray-600">Ground</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-0.5 bg-purple-500 rounded" />
+              <span className="text-xs text-gray-600">Signal</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-0.5 bg-orange-500 rounded" />
+              <span className="text-xs text-gray-600">I2C</span>
+            </div>
+          </div>
+        </Panel>
+      </ReactFlow>
     </div>
   );
 }

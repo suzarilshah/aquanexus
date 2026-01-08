@@ -456,7 +456,7 @@ export function BoardVisualizer({
           </div>
 
           {/* Pinout diagram - Realistic PCB style */}
-          <div className="p-6">
+          <div className="p-6 flex items-center justify-center">
             {/* SVG Definitions for realistic PCB patterns */}
             <svg width="0" height="0" className="absolute">
               <defs>
@@ -504,11 +504,11 @@ export function BoardVisualizer({
             </svg>
 
             <div
-              className="relative rounded-lg mx-auto overflow-hidden"
+              className="relative rounded-lg overflow-hidden w-full max-w-2xl"
               style={{
                 background: 'linear-gradient(180deg, #009e52 0%, #008c4a 50%, #006838 100%)',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
-                padding: '16px',
+                padding: '20px 24px',
               }}
             >
               {/* PCB texture overlay */}
@@ -561,14 +561,14 @@ export function BoardVisualizer({
               </div>
 
               {/* Board content */}
-              <div className="flex justify-between gap-4 pt-6 relative z-10">
+              <div className="flex items-stretch justify-center gap-6 pt-6 relative z-10">
                 {/* Left pins */}
-                <div className="flex flex-col">
+                <div className="flex flex-col justify-center">
                   {leftPins.map((pin, idx) => renderPin(pin, 'left', idx))}
                 </div>
 
                 {/* Center - IC Chip with realistic styling */}
-                <div className="flex flex-col items-center justify-center min-w-[160px]">
+                <div className="flex flex-col items-center justify-center min-w-[140px] flex-shrink-0">
                   {/* Metal shield/can (for WiFi module) */}
                   <div
                     className="rounded-md p-1 mb-2"
@@ -645,7 +645,7 @@ export function BoardVisualizer({
                 </div>
 
                 {/* Right pins */}
-                <div className="flex flex-col">
+                <div className="flex flex-col justify-center">
                   {rightPins.map((pin, idx) => renderPin(pin, 'right', idx))}
                 </div>
               </div>
