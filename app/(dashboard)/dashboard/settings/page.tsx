@@ -174,10 +174,22 @@ export default function SettingsPage() {
       const apiVersion = modelNumber === 1 ? config.model1ApiVersion : config.model2ApiVersion;
       const modelName = modelNumber === 1 ? config.model1Name : config.model2Name;
 
+      // Debug log to verify modelName is being sent
+      console.log('[Test Connection] Sending request with:', {
+        modelNumber,
+        modelName,
+        endpoint,
+        apiVersion,
+        apiKeyLength: apiKey?.length || 0,
+      });
+
+      const requestPayload = { modelNumber, modelName, endpoint, apiKey, apiVersion };
+      console.log('[Test Connection] Full payload (excluding apiKey):', { ...requestPayload, apiKey: '***' });
+
       const res = await fetch('/api/ai/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelNumber, modelName, endpoint, apiKey, apiVersion }),
+        body: JSON.stringify(requestPayload),
       });
 
       const data = await res.json();
