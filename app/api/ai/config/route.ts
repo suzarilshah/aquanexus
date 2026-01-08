@@ -140,7 +140,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { modelNumber, modelName, endpoint, apiKey, apiVersion } = await request.json();
+    const body = await request.json();
+    const { modelNumber, modelName, endpoint, apiKey, apiVersion } = body;
+
+    console.log(`[API Test Connection] Received request for Model ${modelNumber}`);
+    console.log(`[API Test Connection] modelName from request: "${modelName}"`);
+    console.log(`[API Test Connection] endpoint: ${endpoint}`);
 
     if (!modelNumber || !endpoint || !apiKey) {
       return NextResponse.json(
@@ -149,9 +154,13 @@ export async function PUT(request: Request) {
       );
     }
 
+    // Use modelName from request, fallback to generic name if not provided
+    const effectiveModelName = modelName && modelName.trim() ? modelName.trim() : `Model ${modelNumber}`;
+    console.log(`[API Test Connection] Effective model name: "${effectiveModelName}"`);
+
     // Test the connection with detailed error logging
     const result = await testAIConnection({
-      name: modelName || `Model ${modelNumber}`,
+      name: effectiveModelName,
       endpoint,
       apiKey,
       apiVersion,

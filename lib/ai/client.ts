@@ -103,6 +103,9 @@ export async function callAIModel(
 function getErrorSuggestion(statusCode: number, responseBody: string, endpoint: string): string {
   const lowerBody = responseBody.toLowerCase();
 
+  if (lowerBody.includes('unknown_model') || lowerBody.includes('unknown model')) {
+    return 'The model name is incorrect. Make sure the Model Name field matches your deployment exactly (e.g., "DeepSeek-R1").';
+  }
   if (statusCode === 401 || lowerBody.includes('unauthorized') || lowerBody.includes('invalid key')) {
     return 'Check that your API key is correct and has not expired.';
   }
@@ -221,11 +224,36 @@ export async function testAIConnection(config: AIModelConfig): Promise<AIConnect
     }
 
     console.log(`[AI Connection Test] Testing endpoint: ${finalEndpoint.replace(/api-key=[^&]+/, 'api-key=***')}`);
-    console.log(`[AI Connection Test] Model: ${config.name}`);
+    console.log(`[AI Connection Test] Model name being sent: "${config.name}"`);
     console.log(`[AI Connection Test] API Version: ${config.apiVersion || 'not specified'}`);
+
+    // Validate model name
+    if (!config.name || config.name.trim() === '') {
+      return {
+        success: false,
+        error: {
+          code: 'MISSING_MODEL_NAME',
+          message: 'Model name is required',
+          endpoint: config.endpoint,
+          timestamp,
+          suggestion: 'Please enter the model/deployment name (e.g., "DeepSeek-R1" or "gpt-o3-mini").',
+        },
+      };
+    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    const modelName = config.name.trim();
+    const requestBody = {
+      model: modelName, // Required for OpenAI-compatible endpoints like DeepSeek
+      messages: [
+        { role: 'user', content: 'Hello, respond with "OK" only.' },
+      ],
+      max_completion_tokens: 10,
+    };
+
+    console.log(`[AI Connection Test] Request body model field: "${requestBody.model}"`);
 
     const response = await fetch(finalEndpoint, {
       method: 'POST',
@@ -234,13 +262,7 @@ export async function testAIConnection(config: AIModelConfig): Promise<AIConnect
         'api-key': config.apiKey,
         'Authorization': `Bearer ${config.apiKey}`,
       },
-      body: JSON.stringify({
-        model: config.name, // Required for OpenAI-compatible endpoints like DeepSeek
-        messages: [
-          { role: 'user', content: 'Hello, respond with "OK" only.' },
-        ],
-        max_completion_tokens: 10,
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
 
