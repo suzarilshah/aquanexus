@@ -14,24 +14,19 @@ import {
 interface PlantChartsProps {
   data: Array<{
     timestamp: string;
-    soilMoisture: number | null;
-    lightLevel: number | null;
+    height: number | null;
     temperature: number | null;
     humidity: number | null;
+    pressure: number | null;
   }>;
-  metric: 'soilMoisture' | 'lightLevel' | 'temperature' | 'humidity';
+  metric: 'height' | 'temperature' | 'humidity' | 'pressure';
 }
 
 const CHART_CONFIG = {
-  soilMoisture: {
-    color: '#3b82f6',
-    label: 'Soil Moisture (%)',
-    domain: [0, 100],
-  },
-  lightLevel: {
-    color: '#eab308',
-    label: 'Light (lux)',
-    domain: [0, 60000],
+  height: {
+    color: '#22c55e',
+    label: 'Height (cm)',
+    domain: [0, 50],
   },
   temperature: {
     color: '#f97316',
@@ -42,6 +37,11 @@ const CHART_CONFIG = {
     color: '#06b6d4',
     label: 'Humidity (%)',
     domain: [0, 100],
+  },
+  pressure: {
+    color: '#8b5cf6',
+    label: 'Pressure (Pa)',
+    domain: [95000, 105000],
   },
 };
 
@@ -95,9 +95,9 @@ export function PlantCharts({ data, metric }: PlantChartsProps) {
           tick={{ fontSize: 11, fill: '#6b7280' }}
           tickLine={{ stroke: '#e5e7eb' }}
           axisLine={{ stroke: '#e5e7eb' }}
-          width={50}
+          width={60}
           tickFormatter={(value) =>
-            metric === 'lightLevel' && value >= 1000
+            metric === 'pressure' && value >= 1000
               ? `${(value / 1000).toFixed(0)}k`
               : value
           }
@@ -111,7 +111,7 @@ export function PlantCharts({ data, metric }: PlantChartsProps) {
           }}
           labelStyle={{ color: '#374151', fontWeight: 500 }}
           formatter={(value: number) => [
-            metric === 'lightLevel' ? `${value.toLocaleString()} lux` : value.toFixed(1),
+            metric === 'pressure' ? `${value.toLocaleString()} Pa` : value.toFixed(1),
             config.label,
           ]}
         />

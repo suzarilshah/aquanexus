@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { virtualDeviceConfig, devices } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 // GET - Fetch virtual device configuration
 export async function GET() {
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
 
       if (!virtualFish) {
         // Create virtual fish device
-        const fishApiKey = `vfish_${uuidv4().replace(/-/g, '').substring(0, 24)}`;
+        const fishApiKey = `vfish_${randomUUID().replace(/-/g, '').substring(0, 24)}`;
         const [newFishDevice] = await db
           .insert(devices)
           .values({
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
 
       if (!virtualPlant) {
         // Create virtual plant device
-        const plantApiKey = `vplant_${uuidv4().replace(/-/g, '').substring(0, 24)}`;
+        const plantApiKey = `vplant_${randomUUID().replace(/-/g, '').substring(0, 24)}`;
         const [newPlantDevice] = await db
           .insert(devices)
           .values({

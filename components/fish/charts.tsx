@@ -18,11 +18,11 @@ interface FishChartsProps {
     timestamp: string;
     temperature: number | null;
     ph: number | null;
-    dissolvedOxygen: number | null;
+    ecValue: number | null;
     turbidity: number | null;
     tds: number | null;
   }>;
-  metric: 'temperature' | 'ph' | 'dissolvedOxygen' | 'turbidity' | 'tds';
+  metric: 'temperature' | 'ph' | 'ecValue' | 'turbidity' | 'tds';
 }
 
 const CHART_CONFIG = {
@@ -36,10 +36,10 @@ const CHART_CONFIG = {
     label: 'pH',
     domain: [5, 10],
   },
-  dissolvedOxygen: {
+  ecValue: {
     color: '#3b82f6',
-    label: 'DO (mg/L)',
-    domain: [0, 15],
+    label: 'EC (µS/cm)',
+    domain: [0, 1000],
   },
   turbidity: {
     color: '#8b5cf6',
