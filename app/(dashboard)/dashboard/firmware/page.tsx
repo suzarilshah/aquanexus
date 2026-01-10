@@ -1,40 +1,324 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BoardVisualizer, type PinAssignment } from '@/components/onboarding/BoardVisualizer';
 import { BreadboardView } from '@/components/onboarding/BreadboardView';
 import { WebSerialFlasher } from '@/components/onboarding/WebSerialFlasher';
 import { generateFirmware, type FirmwareConfig } from '@/lib/firmware/generator';
-import { BOARDS, BOARD_LIST, getBoard } from '@/data/boards';
+import { BOARD_LIST, getBoard } from '@/data/boards';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Select from '@radix-ui/react-select';
 import * as Switch from '@radix-ui/react-switch';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import {
   Cpu,
   Code,
   Zap,
   Settings,
   ChevronDown,
+  ChevronRight,
   Check,
-  Info,
   AlertTriangle,
   Download,
   Copy,
   Eye,
+  EyeOff,
   Wifi,
-  Clock,
   Radio,
   Power,
   Sparkles,
   CircuitBoard,
+  Key,
+  Server,
+  Timer,
+  Shield,
+  Waves,
+  Leaf,
+  Fish,
+  ArrowRight,
+  Terminal,
+  Globe,
+  Lock,
+  RefreshCw,
 } from 'lucide-react';
 
 type ConfigStep = 'board' | 'pins' | 'settings' | 'flash';
+
+// Animated background orbs component
+function BackgroundOrbs() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-cyan-500/20 to-teal-500/20 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-emerald-500/15 to-cyan-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-br from-teal-400/10 to-emerald-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+    </div>
+  );
+}
+
+// Animated step indicator
+function StepIndicator({
+  steps,
+  currentStep,
+  onStepClick
+}: {
+  steps: Array<{ id: ConfigStep; label: string; icon: React.ElementType }>;
+  currentStep: ConfigStep;
+  onStepClick: (step: ConfigStep) => void;
+}) {
+  const currentIdx = steps.findIndex(s => s.id === currentStep);
+
+  return (
+    <div className="relative">
+      {/* Progress line */}
+      <div className="absolute top-6 left-0 right-0 h-0.5 bg-gray-200 dark:bg-gray-800" />
+      <div
+        className="absolute top-6 left-0 h-0.5 bg-gradient-to-r from-cyan-500 to-teal-500 transition-all duration-500 ease-out"
+        style={{ width: `${(currentIdx / (steps.length - 1)) * 100}%` }}
+      />
+
+      <div className="relative flex justify-between">
+        {steps.map((step, idx) => {
+          const StepIcon = step.icon;
+          const isActive = step.id === currentStep;
+          const isCompleted = idx < currentIdx;
+          const isPending = idx > currentIdx;
+
+          return (
+            <button
+              key={step.id}
+              onClick={() => onStepClick(step.id)}
+              className={cn(
+                "flex flex-col items-center gap-2 group transition-all duration-300",
+                isPending && "opacity-50"
+              )}
+            >
+              <div
+                className={cn(
+                  "relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 transform",
+                  isActive && "bg-gradient-to-br from-cyan-500 to-teal-600 text-white shadow-lg shadow-cyan-500/30 scale-110",
+                  isCompleted && "bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg shadow-emerald-500/20",
+                  isPending && "bg-gray-100 dark:bg-gray-800 text-gray-400",
+                  !isActive && !isCompleted && !isPending && "bg-gray-100 text-gray-400"
+                )}
+              >
+                {isCompleted ? (
+                  <Check className="h-5 w-5" />
+                ) : (
+                  <StepIcon className="h-5 w-5" />
+                )}
+                {isActive && (
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 animate-ping opacity-30" />
+                )}
+              </div>
+              <span
+                className={cn(
+                  "text-xs font-medium transition-colors",
+                  isActive ? "text-cyan-600 dark:text-cyan-400" : "text-gray-500"
+                )}
+              >
+                {step.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Premium card component
+function PremiumCard({
+  children,
+  className,
+  glow = false
+}: {
+  children: React.ReactNode;
+  className?: string;
+  glow?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-xl",
+        glow && "hover:border-cyan-500/50 hover:shadow-cyan-500/10",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Board selection card
+function BoardCard({
+  board,
+  isSelected,
+  onClick,
+  disabled
+}: {
+  board: typeof BOARD_LIST[0];
+  isSelected: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "relative p-5 rounded-2xl border-2 text-left transition-all duration-300 group",
+        isSelected
+          ? "border-cyan-500 bg-gradient-to-br from-cyan-50 to-teal-50 dark:from-cyan-950/30 dark:to-teal-950/30 shadow-lg shadow-cyan-500/20"
+          : "border-gray-200 dark:border-gray-800 hover:border-cyan-300 dark:hover:border-cyan-700 hover:shadow-md",
+        disabled && "opacity-50 cursor-not-allowed"
+      )}
+    >
+      {/* Selection indicator */}
+      {isSelected && (
+        <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center shadow-lg">
+          <Check className="h-4 w-4 text-white" />
+        </div>
+      )}
+
+      {!board.supported && (
+        <div className="absolute top-3 right-3 text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+          Soon
+        </div>
+      )}
+
+      {/* Icon */}
+      <div className={cn(
+        "w-14 h-14 rounded-xl flex items-center justify-center mb-4 transition-all duration-300",
+        isSelected
+          ? "bg-gradient-to-br from-cyan-500 to-teal-600 text-white"
+          : "bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 text-gray-400 group-hover:from-cyan-100 group-hover:to-teal-100 group-hover:text-cyan-600"
+      )}>
+        <Cpu className="h-7 w-7" />
+      </div>
+
+      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{board.name}</h3>
+      <p className="text-sm text-gray-500 mb-3 line-clamp-2">{board.description}</p>
+
+      <div className="flex items-center gap-2">
+        <span className={cn(
+          "text-[10px] font-medium px-2 py-0.5 rounded-full",
+          isSelected
+            ? "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300"
+            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+        )}>
+          {board.category}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// Settings section component
+function SettingsSection({
+  title,
+  icon: Icon,
+  children,
+  description
+}: {
+  title: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+  description?: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
+          <Icon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
+            {title}
+          </h3>
+          {description && (
+            <p className="text-xs text-gray-500">{description}</p>
+          )}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// Toggle switch with label
+function ToggleOption({
+  id,
+  label,
+  description,
+  icon: Icon,
+  checked,
+  onChange,
+  iconColor = "text-gray-500",
+  bgColor = "bg-gray-50 dark:bg-gray-800/50",
+  disabled = false,
+  recommended = false
+}: {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  iconColor?: string;
+  bgColor?: string;
+  disabled?: boolean;
+  recommended?: boolean;
+}) {
+  return (
+    <div className={cn(
+      "flex items-center justify-between p-4 rounded-xl border transition-all duration-200",
+      checked
+        ? "border-cyan-200 dark:border-cyan-800 bg-gradient-to-r from-cyan-50/50 to-teal-50/50 dark:from-cyan-950/20 dark:to-teal-950/20"
+        : "border-gray-200 dark:border-gray-800",
+      bgColor,
+      disabled && "opacity-50"
+    )}>
+      <div className="flex items-center gap-3">
+        <div className={cn(
+          "w-9 h-9 rounded-lg flex items-center justify-center",
+          checked ? "bg-cyan-100 dark:bg-cyan-900/50" : "bg-gray-100 dark:bg-gray-800"
+        )}>
+          <Icon className={cn("h-4 w-4", checked ? "text-cyan-600" : iconColor)} />
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor={id} className="text-sm font-medium cursor-pointer">
+              {label}
+            </Label>
+            {recommended && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gradient-to-r from-cyan-500 to-teal-500 text-white">
+                Recommended
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500">{description}</p>
+        </div>
+      </div>
+      <Switch.Root
+        id={id}
+        checked={checked}
+        onCheckedChange={onChange}
+        disabled={disabled}
+        className={cn(
+          "w-11 h-6 rounded-full relative transition-colors duration-200",
+          checked ? "bg-gradient-to-r from-cyan-500 to-teal-500" : "bg-gray-200 dark:bg-gray-700",
+          disabled && "cursor-not-allowed"
+        )}
+      >
+        <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow-lg transition-transform duration-200 translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
+      </Switch.Root>
+    </div>
+  );
+}
 
 export default function FirmwareConfiguratorPage() {
   // State
@@ -43,22 +327,28 @@ export default function FirmwareConfiguratorPage() {
   const [assignments, setAssignments] = useState<PinAssignment[]>([]);
   const [deviceName, setDeviceName] = useState('AquaNexus-Device');
   const [deviceType, setDeviceType] = useState<'fish' | 'plant' | 'general'>('fish');
+  const [apiKey, setApiKey] = useState('');
+  const [deviceMac, setDeviceMac] = useState('');
   const [serverHost, setServerHost] = useState('aquanexus.vercel.app');
   const [serverPort, setServerPort] = useState(443);
   const [sensorInterval, setSensorInterval] = useState(10000);
-  const [useWebSocket, setUseWebSocket] = useState(false);
   const [useAbly, setUseAbly] = useState(true);
   const [enableOTA, setEnableOTA] = useState(false);
   const [enableDeepSleep, setEnableDeepSleep] = useState(false);
   const [deepSleepDuration, setDeepSleepDuration] = useState(300);
   const [showCode, setShowCode] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const board = useMemo(() => getBoard(selectedBoardId), [selectedBoardId]);
 
   const handleAssign = useCallback((assignment: PinAssignment) => {
     setAssignments((prev) => {
-      // Remove any existing assignment for this pin
       const filtered = prev.filter((a) => a.pinId !== assignment.pinId);
       return [...filtered, assignment];
     });
@@ -75,9 +365,11 @@ export default function FirmwareConfiguratorPage() {
       assignments,
       deviceName,
       deviceType,
+      apiKey: apiKey || undefined,
+      deviceMac: deviceMac || undefined,
       serverHost,
       serverPort,
-      useWebSocket,
+      useWebSocket: false,
       useAbly,
       sensorInterval,
       enableOTA,
@@ -89,9 +381,10 @@ export default function FirmwareConfiguratorPage() {
     assignments,
     deviceName,
     deviceType,
+    apiKey,
+    deviceMac,
     serverHost,
     serverPort,
-    useWebSocket,
     useAbly,
     sensorInterval,
     enableOTA,
@@ -123,11 +416,11 @@ export default function FirmwareConfiguratorPage() {
   }, [generatedFirmware]);
 
   const steps = [
-    { id: 'board', label: 'Select Board', icon: Cpu },
-    { id: 'pins', label: 'Configure Pins', icon: CircuitBoard },
-    { id: 'settings', label: 'Settings', icon: Settings },
-    { id: 'flash', label: 'Flash Firmware', icon: Zap },
-  ] as const;
+    { id: 'board' as const, label: 'Board', icon: Cpu },
+    { id: 'pins' as const, label: 'Sensors', icon: CircuitBoard },
+    { id: 'settings' as const, label: 'Configure', icon: Settings },
+    { id: 'flash' as const, label: 'Deploy', icon: Zap },
+  ];
 
   const canProceed = useMemo(() => {
     switch (currentStep) {
@@ -142,627 +435,654 @@ export default function FirmwareConfiguratorPage() {
     }
   }, [currentStep, board, assignments, deviceName]);
 
+  const goToNextStep = () => {
+    const stepIndex = steps.findIndex((s) => s.id === currentStep);
+    if (stepIndex < steps.length - 1) {
+      setCurrentStep(steps[stepIndex + 1].id);
+    }
+  };
+
+  const goToPrevStep = () => {
+    const stepIndex = steps.findIndex((s) => s.id === currentStep);
+    if (stepIndex > 0) {
+      setCurrentStep(steps[stepIndex - 1].id);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Firmware Configurator</h1>
-          <p className="text-gray-500 mt-1">
-            Configure your ESP32 pins and generate custom firmware
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setShowCode(!showCode)}>
-            <Eye className="h-4 w-4 mr-2" />
-            {showCode ? 'Hide' : 'Preview'} Code
-          </Button>
-        </div>
-      </div>
+    <Tooltip.Provider>
+      <div className={cn(
+        "relative min-h-screen transition-opacity duration-500",
+        mounted ? "opacity-100" : "opacity-0"
+      )}>
+        <BackgroundOrbs />
 
-      {/* Progress Steps */}
-      <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 p-4">
-        {steps.map((step, idx) => {
-          const StepIcon = step.icon;
-          const isActive = step.id === currentStep;
-          const isCompleted = steps.findIndex((s) => s.id === currentStep) > idx;
-
-          return (
-            <React.Fragment key={step.id}>
-              <button
-                onClick={() => setCurrentStep(step.id)}
-                className={cn(
-                  'flex items-center gap-3 px-4 py-2 rounded-lg transition-colors',
-                  isActive && 'bg-blue-50',
-                  !isActive && 'hover:bg-gray-50'
-                )}
-              >
-                <div
-                  className={cn(
-                    'h-10 w-10 rounded-full flex items-center justify-center transition-colors',
-                    isActive && 'bg-gradient-to-br from-blue-500 to-purple-600 text-white',
-                    isCompleted && 'bg-green-500 text-white',
-                    !isActive && !isCompleted && 'bg-gray-100 text-gray-400'
-                  )}
-                >
-                  {isCompleted ? <Check className="h-5 w-5" /> : <StepIcon className="h-5 w-5" />}
+        <div className="relative space-y-8 pb-8">
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                  <Terminal className="h-6 w-6 text-white" />
                 </div>
-                <div className="text-left">
-                  <div
-                    className={cn(
-                      'text-sm font-medium',
-                      isActive ? 'text-gray-900' : 'text-gray-500'
-                    )}
-                  >
-                    {step.label}
-                  </div>
-                  <div className="text-xs text-gray-400">Step {idx + 1}</div>
-                </div>
-              </button>
-              {idx < steps.length - 1 && (
-                <div
-                  className={cn(
-                    'flex-1 h-0.5 mx-2',
-                    isCompleted ? 'bg-green-500' : 'bg-gray-200'
-                  )}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Step 1: Board Selection */}
-          {currentStep === 'board' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Cpu className="h-5 w-5 text-blue-500" />
-                  Select Your Board
-                </CardTitle>
-                <CardDescription>
-                  Choose the microcontroller board you want to program
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {BOARD_LIST.map((boardItem) => (
-                    <button
-                      key={boardItem.id}
-                      onClick={() => boardItem.supported && setSelectedBoardId(boardItem.id)}
-                      disabled={!boardItem.supported}
-                      className={cn(
-                        'relative p-4 rounded-xl border-2 text-left transition-all',
-                        selectedBoardId === boardItem.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300',
-                        !boardItem.supported && 'opacity-50 cursor-not-allowed'
-                      )}
-                    >
-                      {selectedBoardId === boardItem.id && (
-                        <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center">
-                          <Check className="h-4 w-4 text-white" />
-                        </div>
-                      )}
-                      {!boardItem.supported && (
-                        <div className="absolute top-2 right-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
-                          Coming Soon
-                        </div>
-                      )}
-                      <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center mb-3">
-                        <Cpu className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <h3 className="font-semibold text-gray-900">{boardItem.name}</h3>
-                      <p className="text-sm text-gray-500 mt-1">{boardItem.description}</p>
-                      <div className="mt-2">
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
-                          {boardItem.category}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Step 2: Pin Configuration */}
-          {currentStep === 'pins' && board && (
-            <Tabs.Root defaultValue="board" className="space-y-4">
-              <Tabs.List className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
-                <Tabs.Trigger
-                  value="board"
-                  className="px-4 py-2 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                >
-                  Board View
-                </Tabs.Trigger>
-                <Tabs.Trigger
-                  value="breadboard"
-                  className="px-4 py-2 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                >
-                  Breadboard View
-                </Tabs.Trigger>
-              </Tabs.List>
-
-              <Tabs.Content value="board">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CircuitBoard className="h-5 w-5 text-blue-500" />
-                      {board.name} - Pin Configuration
-                    </CardTitle>
-                    <CardDescription>
-                      Click on a GPIO pin to assign a sensor. Hover over pins to see their capabilities.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <BoardVisualizer
-                      board={board}
-                      assignments={assignments}
-                      onAssign={handleAssign}
-                      onUnassign={handleUnassign}
-                    />
-                  </CardContent>
-                </Card>
-              </Tabs.Content>
-
-              <Tabs.Content value="breadboard">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CircuitBoard className="h-5 w-5 text-green-500" />
-                      Breadboard Wiring Diagram
-                    </CardTitle>
-                    <CardDescription>
-                      Visual guide showing how to connect your sensors on a breadboard
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <BreadboardView board={board} assignments={assignments} />
-                  </CardContent>
-                </Card>
-              </Tabs.Content>
-            </Tabs.Root>
-          )}
-
-          {/* Step 3: Settings */}
-          {currentStep === 'settings' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-blue-500" />
-                  Firmware Settings
-                </CardTitle>
-                <CardDescription>
-                  Configure device name, server connection, and behavior options
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Device Settings */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
-                    Device Configuration
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="deviceName">Device Name</Label>
-                      <Input
-                        id="deviceName"
-                        value={deviceName}
-                        onChange={(e) => setDeviceName(e.target.value)}
-                        placeholder="AquaNexus-Device"
-                      />
-                      <p className="text-xs text-gray-500">
-                        Used for WiFi hotspot and identification
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="deviceType">Device Type</Label>
-                      <Select.Root value={deviceType} onValueChange={(v) => setDeviceType(v as typeof deviceType)}>
-                        <Select.Trigger className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                          <Select.Value />
-                          <Select.Icon>
-                            <ChevronDown className="h-4 w-4 opacity-50" />
-                          </Select.Icon>
-                        </Select.Trigger>
-                        <Select.Portal>
-                          <Select.Content className="overflow-hidden bg-white rounded-md shadow-lg border">
-                            <Select.Viewport className="p-1">
-                              <Select.Item value="fish" className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none">
-                                <Select.ItemText>Fish Environment</Select.ItemText>
-                              </Select.Item>
-                              <Select.Item value="plant" className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none">
-                                <Select.ItemText>Plant Environment</Select.ItemText>
-                              </Select.Item>
-                              <Select.Item value="general" className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded outline-none">
-                                <Select.ItemText>General Purpose</Select.ItemText>
-                              </Select.Item>
-                            </Select.Viewport>
-                          </Select.Content>
-                        </Select.Portal>
-                      </Select.Root>
-                    </div>
-                  </div>
-                </div>
-
-                {/* WiFi Provisioning Info */}
-                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                  <div className="flex items-start gap-3">
-                    <Wifi className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-blue-900">WiFi Provisioning Mode</h4>
-                      <p className="text-sm text-blue-700 mt-1">
-                        This firmware uses <strong>WiFiManager</strong> for secure WiFi setup.
-                        No credentials are hardcoded. After flashing:
-                      </p>
-                      <ol className="list-decimal list-inside text-sm text-blue-600 mt-2 space-y-1">
-                        <li>Device creates hotspot: &quot;{deviceName || 'AquaNexus'}-Setup&quot;</li>
-                        <li>Connect with your phone (password: aquanexus123)</li>
-                        <li>Open browser to 192.168.4.1</li>
-                        <li>Select your WiFi network and enter password</li>
-                      </ol>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Server Settings */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
-                    Server Connection
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="serverHost">Server Host</Label>
-                      <Input
-                        id="serverHost"
-                        value={serverHost}
-                        onChange={(e) => setServerHost(e.target.value)}
-                        placeholder="aquanexus.vercel.app"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="serverPort">Server Port</Label>
-                      <Input
-                        id="serverPort"
-                        type="number"
-                        value={serverPort}
-                        onChange={(e) => setServerPort(parseInt(e.target.value) || 443)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg border border-purple-100">
-                    <div className="flex items-center gap-3">
-                      <Radio className="h-5 w-5 text-purple-500" />
-                      <div>
-                        <Label htmlFor="useAbly" className="text-sm font-medium">
-                          Use Ably Real-time (Recommended)
-                        </Label>
-                        <p className="text-xs text-gray-500">
-                          Cloud-based pub/sub messaging for Vercel
-                        </p>
-                      </div>
-                    </div>
-                    <Switch.Root
-                      id="useAbly"
-                      checked={useAbly}
-                      onCheckedChange={(checked) => {
-                        setUseAbly(checked);
-                        if (checked) setUseWebSocket(false);
-                      }}
-                      className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-purple-500 transition-colors"
-                    >
-                      <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow transition-transform translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
-                    </Switch.Root>
-                  </div>
-
-                  {useAbly && (
-                    <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
-                      <p className="text-xs text-purple-700">
-                        <strong>Ably</strong> provides real-time messaging. The ESP32 will publish sensor data to Ably channels,
-                        and your dashboard will subscribe to receive updates instantly. Works with Vercel serverless deployment.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Wifi className="h-5 w-5 text-blue-500" />
-                      <div>
-                        <Label htmlFor="useWebSocket" className="text-sm font-medium">
-                          Direct WebSocket (Advanced)
-                        </Label>
-                        <p className="text-xs text-gray-500">
-                          Requires custom WebSocket server
-                        </p>
-                      </div>
-                    </div>
-                    <Switch.Root
-                      id="useWebSocket"
-                      checked={useWebSocket}
-                      onCheckedChange={(checked) => {
-                        setUseWebSocket(checked);
-                        if (checked) setUseAbly(false);
-                      }}
-                      disabled={useAbly}
-                      className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-500 transition-colors disabled:opacity-50"
-                    >
-                      <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow transition-transform translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
-                    </Switch.Root>
-                  </div>
-                </div>
-
-                {/* Timing Settings */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
-                    Timing & Power
-                  </h3>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="sensorInterval">Sensor Reading Interval (ms)</Label>
-                    <Input
-                      id="sensorInterval"
-                      type="number"
-                      value={sensorInterval}
-                      onChange={(e) => setSensorInterval(parseInt(e.target.value) || 5000)}
-                      min={1000}
-                      step={1000}
-                    />
-                    <p className="text-xs text-gray-500">
-                      How often to read and send sensor data ({sensorInterval / 1000} seconds)
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Sparkles className="h-5 w-5 text-orange-500" />
-                        <div>
-                          <Label htmlFor="enableOTA" className="text-sm font-medium">
-                            OTA Updates
-                          </Label>
-                          <p className="text-xs text-gray-500">
-                            Over-the-air firmware updates
-                          </p>
-                        </div>
-                      </div>
-                      <Switch.Root
-                        id="enableOTA"
-                        checked={enableOTA}
-                        onCheckedChange={setEnableOTA}
-                        className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-500 transition-colors"
-                      >
-                        <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow transition-transform translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
-                      </Switch.Root>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Power className="h-5 w-5 text-green-500" />
-                        <div>
-                          <Label htmlFor="enableDeepSleep" className="text-sm font-medium">
-                            Deep Sleep
-                          </Label>
-                          <p className="text-xs text-gray-500">
-                            Power saving mode
-                          </p>
-                        </div>
-                      </div>
-                      <Switch.Root
-                        id="enableDeepSleep"
-                        checked={enableDeepSleep}
-                        onCheckedChange={setEnableDeepSleep}
-                        className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-500 transition-colors"
-                      >
-                        <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow transition-transform translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
-                      </Switch.Root>
-                    </div>
-                  </div>
-
-                  {enableDeepSleep && (
-                    <div className="space-y-2">
-                      <Label htmlFor="deepSleepDuration">Deep Sleep Duration (seconds)</Label>
-                      <Input
-                        id="deepSleepDuration"
-                        type="number"
-                        value={deepSleepDuration}
-                        onChange={(e) => setDeepSleepDuration(parseInt(e.target.value) || 300)}
-                        min={60}
-                        step={60}
-                      />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Step 4: Flash */}
-          {currentStep === 'flash' && generatedFirmware && (
-            <div className="space-y-6">
-              {/* Warnings */}
-              {generatedFirmware.warnings.length > 0 && (
-                <Card className="border-amber-200 bg-amber-50">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
-                      <div>
-                        <h4 className="font-medium text-amber-800">Warnings</h4>
-                        <ul className="list-disc list-inside text-sm text-amber-700 mt-2 space-y-1">
-                          {generatedFirmware.warnings.map((warning, idx) => (
-                            <li key={idx}>{warning}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Flash Component */}
-              <WebSerialFlasher
-                code={generatedFirmware.code}
-                filename={generatedFirmware.filename}
-                onFlashComplete={() => {
-                  // Handle success
-                }}
-                onFlashError={(error) => {
-                  console.error('Flash error:', error);
-                }}
-              />
-
-              {/* Required Libraries */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Code className="h-5 w-5 text-purple-500" />
-                    Required Libraries
-                  </CardTitle>
-                  <CardDescription>
-                    Install these libraries in Arduino IDE before compiling
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {generatedFirmware.libraries.map((lib) => (
-                      <div
-                        key={lib.name}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                      >
-                        <span className="font-medium text-gray-900">{lib.name}</span>
-                        {lib.github && (
-                          <a
-                            href={lib.github}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-500 hover:underline"
-                          >
-                            GitHub
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Summary Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Configuration Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Board</span>
-                  <span className="font-medium">{board?.name || 'Not selected'}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Sensors</span>
-                  <span className="font-medium">{assignments.length} assigned</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Device Name</span>
-                  <span className="font-medium">{deviceName || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Type</span>
-                  <span className="font-medium capitalize">{deviceType}</span>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                    Firmware Studio
+                  </h1>
+                  <p className="text-sm text-gray-500">
+                    Configure & deploy custom ESP32 firmware
+                  </p>
                 </div>
               </div>
+            </div>
 
-              {/* Assigned Sensors */}
-              {assignments.length > 0 && (
-                <div className="pt-4 border-t">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Assigned Sensors</h4>
-                  <div className="space-y-2">
-                    {assignments.map((a) => (
-                      <div
-                        key={a.pinId}
-                        className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded"
-                      >
-                        <span className="font-medium">{a.sensor.name}</span>
-                        <span className="text-gray-500">GPIO {a.gpio}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Code Preview Card */}
-          {showCode && generatedFirmware && (
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Generated Code</CardTitle>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={handleCopyCode}>
-                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={handleDownloadCode}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="max-h-96 overflow-auto bg-gray-900 rounded-lg p-4">
-                  <pre className="text-xs text-gray-100 font-mono whitespace-pre-wrap">
-                    {generatedFirmware.code.slice(0, 2000)}
-                    {generatedFirmware.code.length > 2000 && '\n\n... (truncated)'}
-                  </pre>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Navigation Buttons */}
-          <div className="flex gap-2">
-            {currentStep !== 'board' && (
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  const stepIndex = steps.findIndex((s) => s.id === currentStep);
-                  if (stepIndex > 0) {
-                    setCurrentStep(steps[stepIndex - 1].id);
-                  }
-                }}
+                onClick={() => setShowCode(!showCode)}
+                className="gap-2 rounded-xl border-gray-200 dark:border-gray-800 hover:border-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 transition-all"
               >
-                Back
+                {showCode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showCode ? 'Hide' : 'Preview'} Code
               </Button>
-            )}
-            {currentStep !== 'flash' && (
-              <Button
-                className="flex-1"
-                disabled={!canProceed}
-                onClick={() => {
-                  const stepIndex = steps.findIndex((s) => s.id === currentStep);
-                  if (stepIndex < steps.length - 1) {
-                    setCurrentStep(steps[stepIndex + 1].id);
-                  }
-                }}
-              >
-                Continue
-              </Button>
-            )}
+            </div>
+          </div>
+
+          {/* Step Indicator */}
+          <PremiumCard className="p-6">
+            <StepIndicator
+              steps={steps}
+              currentStep={currentStep}
+              onStepClick={setCurrentStep}
+            />
+          </PremiumCard>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Step 1: Board Selection */}
+              {currentStep === 'board' && (
+                <PremiumCard glow className="p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center">
+                      <Cpu className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Select Your Microcontroller
+                      </h2>
+                      <p className="text-sm text-gray-500">
+                        Choose the board powering your aquaponics system
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {BOARD_LIST.map((boardItem) => (
+                      <BoardCard
+                        key={boardItem.id}
+                        board={boardItem}
+                        isSelected={selectedBoardId === boardItem.id}
+                        onClick={() => boardItem.supported && setSelectedBoardId(boardItem.id)}
+                        disabled={!boardItem.supported}
+                      />
+                    ))}
+                  </div>
+                </PremiumCard>
+              )}
+
+              {/* Step 2: Pin Configuration */}
+              {currentStep === 'pins' && board && (
+                <Tabs.Root defaultValue="board" className="space-y-4">
+                  <Tabs.List className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl w-fit">
+                    <Tabs.Trigger
+                      value="board"
+                      className="px-4 py-2 text-sm font-medium rounded-lg transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-cyan-600"
+                    >
+                      Board View
+                    </Tabs.Trigger>
+                    <Tabs.Trigger
+                      value="breadboard"
+                      className="px-4 py-2 text-sm font-medium rounded-lg transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-cyan-600"
+                    >
+                      Wiring Guide
+                    </Tabs.Trigger>
+                  </Tabs.List>
+
+                  <Tabs.Content value="board">
+                    <PremiumCard glow className="p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center">
+                          <CircuitBoard className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {board.name} Pin Configuration
+                          </h2>
+                          <p className="text-sm text-gray-500">
+                            Click GPIO pins to assign sensors
+                          </p>
+                        </div>
+                      </div>
+                      <BoardVisualizer
+                        board={board}
+                        assignments={assignments}
+                        onAssign={handleAssign}
+                        onUnassign={handleUnassign}
+                      />
+                    </PremiumCard>
+                  </Tabs.Content>
+
+                  <Tabs.Content value="breadboard">
+                    <PremiumCard glow className="p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
+                          <Waves className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            Breadboard Wiring Diagram
+                          </h2>
+                          <p className="text-sm text-gray-500">
+                            Visual guide for connecting your sensors
+                          </p>
+                        </div>
+                      </div>
+                      <BreadboardView board={board} assignments={assignments} />
+                    </PremiumCard>
+                  </Tabs.Content>
+                </Tabs.Root>
+              )}
+
+              {/* Step 3: Settings */}
+              {currentStep === 'settings' && (
+                <div className="space-y-6">
+                  {/* API Connection - CRITICAL */}
+                  <PremiumCard glow className="p-6 border-cyan-200 dark:border-cyan-800">
+                    <SettingsSection
+                      title="API Connection"
+                      icon={Key}
+                      description="Connect your device to AquaNexus cloud"
+                    >
+                      <div className="mt-4 space-y-4">
+                        {/* API Key */}
+                        <div className="space-y-2">
+                          <Label htmlFor="apiKey" className="flex items-center gap-2">
+                            <Shield className="h-4 w-4 text-cyan-500" />
+                            API Key
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                              Required
+                            </span>
+                          </Label>
+                          <div className="relative">
+                            <Input
+                              id="apiKey"
+                              type={showApiKey ? "text" : "password"}
+                              value={apiKey}
+                              onChange={(e) => setApiKey(e.target.value)}
+                              placeholder="Enter your device API key from dashboard"
+                              className="pr-10 font-mono text-sm rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowApiKey(!showApiKey)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                              {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            Find this in Dashboard → Devices → Your Device → Copy API Key
+                          </p>
+                        </div>
+
+                        {/* Device MAC */}
+                        <div className="space-y-2">
+                          <Label htmlFor="deviceMac" className="flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-cyan-500" />
+                            Device MAC Address
+                            <span className="text-[10px] text-gray-400">(Optional)</span>
+                          </Label>
+                          <Input
+                            id="deviceMac"
+                            value={deviceMac}
+                            onChange={(e) => setDeviceMac(e.target.value)}
+                            placeholder="AA:BB:CC:DD:EE:FF (auto-detected if empty)"
+                            className="font-mono text-sm rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                          />
+                          <p className="text-xs text-gray-500">
+                            Leave empty to use ESP32&apos;s built-in MAC address
+                          </p>
+                        </div>
+
+                        {/* Connection Info Box */}
+                        <div className="bg-gradient-to-br from-cyan-50 to-teal-50 dark:from-cyan-950/30 dark:to-teal-950/30 rounded-xl p-4 border border-cyan-100 dark:border-cyan-900">
+                          <div className="flex items-start gap-3">
+                            <Lock className="h-5 w-5 text-cyan-600 flex-shrink-0 mt-0.5" />
+                            <div className="space-y-2 text-sm">
+                              <p className="text-cyan-800 dark:text-cyan-200 font-medium">
+                                Secure HTTPS Connection
+                              </p>
+                              <p className="text-cyan-600 dark:text-cyan-400 text-xs">
+                                Your device will send encrypted data to{' '}
+                                <code className="bg-cyan-100 dark:bg-cyan-900 px-1 py-0.5 rounded">
+                                  https://{serverHost}/api/telemetry
+                                </code>
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </SettingsSection>
+                  </PremiumCard>
+
+                  {/* Device Identity */}
+                  <PremiumCard glow className="p-6">
+                    <SettingsSection title="Device Identity" icon={Cpu}>
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="deviceName">Device Name</Label>
+                          <Input
+                            id="deviceName"
+                            value={deviceName}
+                            onChange={(e) => setDeviceName(e.target.value)}
+                            placeholder="AquaNexus-Device"
+                            className="rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                          />
+                          <p className="text-xs text-gray-500">
+                            WiFi hotspot name for initial setup
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="deviceType">Monitoring Type</Label>
+                          <Select.Root value={deviceType} onValueChange={(v) => setDeviceType(v as typeof deviceType)}>
+                            <Select.Trigger className="flex h-10 w-full items-center justify-between rounded-xl border border-gray-200 dark:border-gray-800 bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:border-cyan-500">
+                              <div className="flex items-center gap-2">
+                                {deviceType === 'fish' && <Fish className="h-4 w-4 text-cyan-500" />}
+                                {deviceType === 'plant' && <Leaf className="h-4 w-4 text-emerald-500" />}
+                                {deviceType === 'general' && <Waves className="h-4 w-4 text-purple-500" />}
+                                <Select.Value />
+                              </div>
+                              <Select.Icon>
+                                <ChevronDown className="h-4 w-4 opacity-50" />
+                              </Select.Icon>
+                            </Select.Trigger>
+                            <Select.Portal>
+                              <Select.Content className="overflow-hidden bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 z-50">
+                                <Select.Viewport className="p-1">
+                                  <Select.Item value="fish" className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 dark:hover:bg-cyan-950/30 rounded-lg outline-none flex items-center gap-2">
+                                    <Fish className="h-4 w-4 text-cyan-500" />
+                                    <Select.ItemText>Fish Tank Monitoring</Select.ItemText>
+                                  </Select.Item>
+                                  <Select.Item value="plant" className="px-3 py-2 text-sm cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg outline-none flex items-center gap-2">
+                                    <Leaf className="h-4 w-4 text-emerald-500" />
+                                    <Select.ItemText>Plant Grow Bed</Select.ItemText>
+                                  </Select.Item>
+                                  <Select.Item value="general" className="px-3 py-2 text-sm cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-950/30 rounded-lg outline-none flex items-center gap-2">
+                                    <Waves className="h-4 w-4 text-purple-500" />
+                                    <Select.ItemText>General Purpose</Select.ItemText>
+                                  </Select.Item>
+                                </Select.Viewport>
+                              </Select.Content>
+                            </Select.Portal>
+                          </Select.Root>
+                        </div>
+                      </div>
+                    </SettingsSection>
+                  </PremiumCard>
+
+                  {/* WiFi Setup Info */}
+                  <PremiumCard className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                        <Wifi className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="space-y-3">
+                        <h4 className="font-semibold text-blue-900 dark:text-blue-100">
+                          Smart WiFi Provisioning
+                        </h4>
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          No WiFi credentials stored in code! After flashing:
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {[
+                            { step: 1, text: `Connect to "${deviceName || 'AquaNexus'}-Setup"` },
+                            { step: 2, text: 'Password: aquanexus123' },
+                            { step: 3, text: 'Open 192.168.4.1 in browser' },
+                            { step: 4, text: 'Select your WiFi & done!' },
+                          ].map(({ step, text }) => (
+                            <div key={step} className="flex items-center gap-2 bg-blue-100/50 dark:bg-blue-900/30 rounded-lg px-3 py-2">
+                              <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">
+                                {step}
+                              </span>
+                              <span className="text-xs text-blue-800 dark:text-blue-200">{text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </PremiumCard>
+
+                  {/* Server & Connectivity */}
+                  <PremiumCard glow className="p-6">
+                    <SettingsSection title="Server Connection" icon={Server}>
+                      <div className="mt-4 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="serverHost">Server Host</Label>
+                            <Input
+                              id="serverHost"
+                              value={serverHost}
+                              onChange={(e) => setServerHost(e.target.value)}
+                              placeholder="aquanexus.vercel.app"
+                              className="rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="serverPort">Port</Label>
+                            <Input
+                              id="serverPort"
+                              type="number"
+                              value={serverPort}
+                              onChange={(e) => setServerPort(parseInt(e.target.value) || 443)}
+                              className="rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                            />
+                          </div>
+                        </div>
+
+                        <ToggleOption
+                          id="useAbly"
+                          label="Ably Real-time Streaming"
+                          description="Cloud pub/sub for instant dashboard updates"
+                          icon={Radio}
+                          checked={useAbly}
+                          onChange={setUseAbly}
+                          recommended
+                        />
+                      </div>
+                    </SettingsSection>
+                  </PremiumCard>
+
+                  {/* Timing & Power */}
+                  <PremiumCard glow className="p-6">
+                    <SettingsSection title="Timing & Power" icon={Timer}>
+                      <div className="mt-4 space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="sensorInterval">Reading Interval</Label>
+                          <div className="flex items-center gap-3">
+                            <Input
+                              id="sensorInterval"
+                              type="number"
+                              value={sensorInterval}
+                              onChange={(e) => setSensorInterval(parseInt(e.target.value) || 5000)}
+                              min={1000}
+                              step={1000}
+                              className="rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20 flex-1"
+                            />
+                            <span className="text-sm text-gray-500 whitespace-nowrap">
+                              = {sensorInterval / 1000}s
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            How often to read sensors and send data (milliseconds)
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <ToggleOption
+                            id="enableOTA"
+                            label="OTA Updates"
+                            description="Update firmware wirelessly"
+                            icon={RefreshCw}
+                            checked={enableOTA}
+                            onChange={setEnableOTA}
+                          />
+                          <ToggleOption
+                            id="enableDeepSleep"
+                            label="Deep Sleep"
+                            description="Battery saving mode"
+                            icon={Power}
+                            checked={enableDeepSleep}
+                            onChange={setEnableDeepSleep}
+                          />
+                        </div>
+
+                        {enableDeepSleep && (
+                          <div className="space-y-2 pl-12">
+                            <Label htmlFor="deepSleepDuration">Sleep Duration (seconds)</Label>
+                            <Input
+                              id="deepSleepDuration"
+                              type="number"
+                              value={deepSleepDuration}
+                              onChange={(e) => setDeepSleepDuration(parseInt(e.target.value) || 300)}
+                              min={60}
+                              step={60}
+                              className="rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </SettingsSection>
+                  </PremiumCard>
+                </div>
+              )}
+
+              {/* Step 4: Flash */}
+              {currentStep === 'flash' && generatedFirmware && (
+                <div className="space-y-6">
+                  {/* Warnings */}
+                  {generatedFirmware.warnings.length > 0 && (
+                    <PremiumCard className="p-6 border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0">
+                          <AlertTriangle className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                            Configuration Warnings
+                          </h4>
+                          <ul className="space-y-1">
+                            {generatedFirmware.warnings.map((warning, idx) => (
+                              <li key={idx} className="text-sm text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                                <ChevronRight className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                                {warning}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </PremiumCard>
+                  )}
+
+                  {/* Flash Component */}
+                  <WebSerialFlasher
+                    code={generatedFirmware.code}
+                    filename={generatedFirmware.filename}
+                    onFlashComplete={() => {}}
+                    onFlashError={(error) => console.error('Flash error:', error)}
+                  />
+
+                  {/* Required Libraries */}
+                  <PremiumCard glow className="p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+                        <Code className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          Required Libraries
+                        </h2>
+                        <p className="text-sm text-gray-500">
+                          Install in Arduino IDE before compiling
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {generatedFirmware.libraries.map((lib) => (
+                        <div
+                          key={lib.name}
+                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-purple-200 dark:hover:border-purple-800 transition-colors"
+                        >
+                          <span className="font-medium text-gray-900 dark:text-white text-sm">{lib.name}</span>
+                          {lib.github && (
+                            <a
+                              href={lib.github}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-purple-500 hover:text-purple-600 hover:underline transition-colors"
+                            >
+                              GitHub →
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </PremiumCard>
+                </div>
+              )}
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Configuration Summary */}
+              <PremiumCard className="p-6 sticky top-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-cyan-500" />
+                  Summary
+                </h3>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-sm text-gray-500">Board</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{board?.name || 'None'}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-sm text-gray-500">Sensors</span>
+                    <span className={cn(
+                      "text-sm font-medium",
+                      assignments.length > 0 ? "text-emerald-600" : "text-gray-400"
+                    )}>
+                      {assignments.length} assigned
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-sm text-gray-500">Type</span>
+                    <span className="text-sm font-medium capitalize flex items-center gap-1.5">
+                      {deviceType === 'fish' && <Fish className="h-3.5 w-3.5 text-cyan-500" />}
+                      {deviceType === 'plant' && <Leaf className="h-3.5 w-3.5 text-emerald-500" />}
+                      {deviceType}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-sm text-gray-500">API Key</span>
+                    <span className={cn(
+                      "text-sm font-medium",
+                      apiKey ? "text-emerald-600" : "text-amber-500"
+                    )}>
+                      {apiKey ? '✓ Set' : 'Not set'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm text-gray-500">Connectivity</span>
+                    <span className="text-sm font-medium text-purple-600 flex items-center gap-1">
+                      {useAbly ? <Radio className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
+                      {useAbly ? 'Ably' : 'HTTP'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Assigned Sensors */}
+                {assignments.length > 0 && (
+                  <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Assigned Sensors</h4>
+                    <div className="space-y-2">
+                      {assignments.map((a) => (
+                        <div
+                          key={a.pinId}
+                          className="flex items-center justify-between text-xs p-2.5 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800 dark:to-gray-800/50 rounded-lg"
+                        >
+                          <span className="font-medium text-gray-900 dark:text-white">{a.sensor.name}</span>
+                          <span className="text-gray-500 font-mono">GPIO{a.gpio}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Navigation */}
+                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
+                  {currentStep !== 'flash' && (
+                    <Button
+                      onClick={goToNextStep}
+                      disabled={!canProceed}
+                      className="w-full gap-2 bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 text-white rounded-xl h-11 font-medium shadow-lg shadow-cyan-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      Continue
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {currentStep !== 'board' && (
+                    <Button
+                      variant="outline"
+                      onClick={goToPrevStep}
+                      className="w-full rounded-xl h-10 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      Back
+                    </Button>
+                  )}
+                </div>
+              </PremiumCard>
+
+              {/* Code Preview */}
+              {showCode && generatedFirmware && (
+                <PremiumCard className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <Terminal className="h-5 w-5 text-gray-500" />
+                      Code
+                    </h3>
+                    <div className="flex gap-1">
+                      <Tooltip.Root>
+                        <Tooltip.Trigger asChild>
+                          <Button variant="ghost" size="sm" onClick={handleCopyCode} className="h-8 w-8 p-0 rounded-lg">
+                            {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Portal>
+                          <Tooltip.Content className="bg-gray-900 text-white text-xs px-2 py-1 rounded" sideOffset={5}>
+                            {copied ? 'Copied!' : 'Copy code'}
+                          </Tooltip.Content>
+                        </Tooltip.Portal>
+                      </Tooltip.Root>
+                      <Tooltip.Root>
+                        <Tooltip.Trigger asChild>
+                          <Button variant="ghost" size="sm" onClick={handleDownloadCode} className="h-8 w-8 p-0 rounded-lg">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Portal>
+                          <Tooltip.Content className="bg-gray-900 text-white text-xs px-2 py-1 rounded" sideOffset={5}>
+                            Download .ino
+                          </Tooltip.Content>
+                        </Tooltip.Portal>
+                      </Tooltip.Root>
+                    </div>
+                  </div>
+                  <div className="max-h-80 overflow-auto bg-gray-950 rounded-xl p-4 border border-gray-800">
+                    <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
+                      {generatedFirmware.code.slice(0, 2500)}
+                      {generatedFirmware.code.length > 2500 && (
+                        <span className="text-gray-500">{'\n\n'}... ({generatedFirmware.code.length - 2500} more characters)</span>
+                      )}
+                    </pre>
+                  </div>
+                </PremiumCard>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Tooltip.Provider>
   );
 }

@@ -14,10 +14,14 @@ export interface FirmwareConfig {
   serverHost: string;
   serverPort: number;
   useWebSocket: boolean;
+  useAbly: boolean;
   sensorInterval: number;
   enableOTA: boolean;
   enableDeepSleep: boolean;
   deepSleepDuration: number;
+  // New fields for API connection
+  apiKey?: string;
+  deviceMac?: string;
 }
 
 export interface GeneratedFirmware {
@@ -28,7 +32,7 @@ export interface GeneratedFirmware {
 }
 
 // Collect unique libraries from all sensors
-function collectLibraries(assignments: PinAssignment[]): LibraryDependency[] {
+function collectLibraries(assignments: PinAssignment[], useAbly: boolean): LibraryDependency[] {
   const libraryMap = new Map<string, LibraryDependency>();
 
   // Always include WiFiManager for provisioning
@@ -49,6 +53,15 @@ function collectLibraries(assignments: PinAssignment[]): LibraryDependency[] {
     name: 'Preferences',
     include: '#include <Preferences.h>',
   });
+
+  // Add Ably MQTT if enabled
+  if (useAbly) {
+    libraryMap.set('PubSubClient', {
+      name: 'PubSubClient',
+      include: '#include <PubSubClient.h>',
+      github: 'https://github.com/knolleary/pubsubclient',
+    });
+  }
 
   // Collect from sensors
   for (const assignment of assignments) {
@@ -135,70 +148,78 @@ function generateLoopCode(assignments: PinAssignment[]): string {
   return loopCodes.join('\n');
 }
 
-// Generate JSON payload creation code
-function generateJsonPayload(assignments: PinAssignment[], deviceType: string): string {
-  const payloadLines: string[] = [];
+// Generate readings array building code that matches the telemetry API format
+function generateReadingsArrayCode(assignments: PinAssignment[], deviceType: string): string {
+  const readingLines: string[] = [];
 
   for (const assignment of assignments) {
     const gpio = assignment.gpio;
     const sensorId = assignment.sensor.id;
 
-    // Map sensor readings to JSON fields based on sensor type
+    // Generate code to add readings to the array
+    // Format: { "type": "sensor_name", "value": value, "unit": "unit" }
     switch (sensorId) {
       case 'ds18b20':
-        payloadLines.push(`  doc["data"]["temperature"] = temperature_${gpio};`);
+        readingLines.push(`  addReading(readings, "temperature", temperature_${gpio}, "°C");`);
         break;
       case 'dht22':
       case 'dht11':
-        payloadLines.push(`  doc["data"]["temperature"] = dhtTemp_${gpio};`);
-        payloadLines.push(`  doc["data"]["humidity"] = dhtHumidity_${gpio};`);
+        readingLines.push(`  addReading(readings, "temperature", dhtTemp_${gpio}, "°C");`);
+        readingLines.push(`  addReading(readings, "humidity", dhtHumidity_${gpio}, "%");`);
         break;
       case 'ph-sensor':
-        payloadLines.push(`  doc["data"]["ph"] = phValue_${gpio};`);
+        readingLines.push(`  addReading(readings, "ph", phValue_${gpio}, "");`);
         break;
       case 'tds-sensor':
-        payloadLines.push(`  doc["data"]["tds"] = tdsValue_${gpio};`);
+        readingLines.push(`  addReading(readings, "tds", tdsValue_${gpio}, "ppm");`);
+        // TDS sensor also provides EC value
+        readingLines.push(`  addReading(readings, "ecValue", ecValue_${gpio}, "µS/cm");`);
         break;
       case 'turbidity-sensor':
-        payloadLines.push(`  doc["data"]["turbidity"] = turbidityNTU_${gpio};`);
+        readingLines.push(`  addReading(readings, "turbidity", turbidityNTU_${gpio}, "NTU");`);
         break;
       case 'dissolved-oxygen':
-        payloadLines.push(`  doc["data"]["dissolvedOxygen"] = dissolvedOxygen_${gpio};`);
+        readingLines.push(`  addReading(readings, "dissolvedOxygen", dissolvedOxygen_${gpio}, "mg/L");`);
         break;
       case 'water-level':
-        payloadLines.push(`  doc["data"]["waterLevel"] = waterLevel_${gpio};`);
+        readingLines.push(`  addReading(readings, "waterLevel", waterLevel_${gpio}, "cm");`);
         break;
       case 'soil-moisture':
-        payloadLines.push(`  doc["data"]["soilMoisture"] = soilMoisture_${gpio};`);
+        readingLines.push(`  addReading(readings, "soilMoisture", soilMoisture_${gpio}, "%");`);
         break;
       case 'bme280':
-        payloadLines.push(`  doc["data"]["temperature"] = bmeTemp;`);
-        payloadLines.push(`  doc["data"]["humidity"] = bmeHumidity;`);
-        payloadLines.push(`  doc["data"]["pressure"] = bmePressure;`);
+        readingLines.push(`  addReading(readings, "temperature", bmeTemp, "°C");`);
+        readingLines.push(`  addReading(readings, "humidity", bmeHumidity, "%");`);
+        readingLines.push(`  addReading(readings, "pressure", bmePressure, "Pa");`);
         break;
       case 'ldr':
-        payloadLines.push(`  doc["data"]["lightLevel"] = lightLevel_${gpio};`);
+        readingLines.push(`  addReading(readings, "lightLevel", lightLevel_${gpio}, "lux");`);
         break;
       case 'bh1750':
-        payloadLines.push(`  doc["data"]["lux"] = luxValue;`);
+        readingLines.push(`  addReading(readings, "lux", luxValue, "lux");`);
         break;
       case 'hcsr04':
-        payloadLines.push(`  doc["data"]["distance"] = distance_${gpio};`);
+        // For plant monitoring, distance sensor measures plant height
+        if (deviceType === 'plant') {
+          readingLines.push(`  addReading(readings, "height", calculateHeight(distance_${gpio}), "cm");`);
+        } else {
+          readingLines.push(`  addReading(readings, "distance", distance_${gpio}, "cm");`);
+        }
         break;
       case 'relay':
-        payloadLines.push(`  doc["data"]["relay_${gpio}"] = relayState_${gpio};`);
+        readingLines.push(`  addReading(readings, "relay_${gpio}", relayState_${gpio} ? 1 : 0, "");`);
         break;
       case 'pump':
-        payloadLines.push(`  doc["data"]["pump_${gpio}"] = pumpState_${gpio};`);
+        readingLines.push(`  addReading(readings, "pump_${gpio}", pumpState_${gpio} ? 1 : 0, "");`);
         break;
     }
   }
 
-  return payloadLines.join('\n');
+  return readingLines.join('\n');
 }
 
 // Check for warnings based on pin assignments
-function checkWarnings(assignments: PinAssignment[], board: BoardDefinition): string[] {
+function checkWarnings(assignments: PinAssignment[], board: BoardDefinition, config: FirmwareConfig): string[] {
   const warnings: string[] = [];
 
   for (const assignment of assignments) {
@@ -219,18 +240,32 @@ function checkWarnings(assignments: PinAssignment[], board: BoardDefinition): st
     warnings.push('Multiple I2C devices detected - ensure they have different addresses');
   }
 
+  // Check for missing API key
+  if (!config.apiKey || config.apiKey.trim() === '') {
+    warnings.push('No API key provided - device will need to be registered manually');
+  }
+
+  // Check for missing MAC address (manual entry)
+  if (config.deviceMac && !/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(config.deviceMac)) {
+    warnings.push('Invalid MAC address format - will use auto-detected MAC');
+  }
+
   return warnings;
 }
 
 export function generateFirmware(config: FirmwareConfig): GeneratedFirmware {
-  const libraries = collectLibraries(config.assignments);
-  const warnings = checkWarnings(config.assignments, config.board);
+  const libraries = collectLibraries(config.assignments, config.useAbly);
+  const warnings = checkWarnings(config.assignments, config.board, config);
 
   const includeStatements = libraries.map(lib => lib.include).join('\n');
   const variableDeclarations = generateVariableDeclarations(config.assignments);
   const setupCode = generateSetupCode(config.assignments);
   const loopCode = generateLoopCode(config.assignments);
-  const jsonPayload = generateJsonPayload(config.assignments, config.deviceType);
+  const readingsArrayCode = generateReadingsArrayCode(config.assignments, config.deviceType);
+
+  // Determine if we have height sensor for plant type
+  const hasHeightSensor = config.deviceType === 'plant' &&
+    config.assignments.some(a => a.sensor.id === 'hcsr04');
 
   const code = `/*
  * AquaNexus ESP32 Firmware
@@ -250,41 +285,79 @@ ${libraries.map(lib => ` *   - ${lib.name}${lib.github ? ` (${lib.github})` : ''
 
 // ========== LIBRARY INCLUDES ==========
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
-#include <WebSocketsClient.h>
+${config.useAbly ? '#include <PubSubClient.h>' : ''}
 ${includeStatements}
 
 // ========== CONFIGURATION ==========
+// Device Configuration
 #define DEVICE_NAME "${config.deviceName}"
 #define DEVICE_TYPE "${config.deviceType}"
+${config.deviceMac ? `#define DEVICE_MAC "${config.deviceMac}"` : '// MAC will be auto-detected'}
+${config.apiKey ? `#define API_KEY "${config.apiKey}"` : '#define API_KEY ""  // Get this from your AquaNexus dashboard'}
+
+// Server Configuration
 #define SERVER_HOST "${config.serverHost}"
 #define SERVER_PORT ${config.serverPort}
+#define API_ENDPOINT "https://${config.serverHost}/api/telemetry"
+#define USE_HTTPS true
+
+// Timing Configuration
 #define SENSOR_INTERVAL ${config.sensorInterval}
-#define USE_WEBSOCKET ${config.useWebSocket ? 'true' : 'false'}
+#define HEARTBEAT_INTERVAL 30000
+
+// Feature Toggles
+#define USE_ABLY ${config.useAbly ? 'true' : 'false'}
 #define ENABLE_OTA ${config.enableOTA ? 'true' : 'false'}
 ${config.enableDeepSleep ? `#define ENABLE_DEEP_SLEEP true\n#define DEEP_SLEEP_DURATION ${config.deepSleepDuration}` : '#define ENABLE_DEEP_SLEEP false'}
 
 // Built-in LED for status indication
 #define LED_PIN 2
 
+${hasHeightSensor ? `// Plant height calculation
+// Adjust SENSOR_HEIGHT_CM to the height of your ultrasonic sensor from the ground
+#define SENSOR_HEIGHT_CM 100.0  // Height of sensor from ground in cm
+float calculateHeight(float distance) {
+  // Height = Sensor height - distance measured
+  float height = SENSOR_HEIGHT_CM - distance;
+  return height > 0 ? height : 0;
+}
+` : ''}
+
 // ========== SENSOR VARIABLES ==========
 ${variableDeclarations}
 
 // ========== SYSTEM VARIABLES ==========
 WiFiManager wifiManager;
-WebSocketsClient webSocket;
+WiFiClientSecure secureClient;
 HTTPClient http;
 Preferences preferences;
 
-String deviceId;
-String apiKey;
+${config.useAbly ? `// Ably MQTT Configuration
+WiFiClient ablyClient;
+PubSubClient mqtt(ablyClient);
+const char* ABLY_HOST = "mqtt.ably.io";
+const int ABLY_PORT = 1883;
+String ablyClientId;
+` : ''}
+
 String deviceMac;
-bool isProvisioned = false;
+String apiKey;
 bool wifiConnected = false;
 
 unsigned long lastSensorRead = 0;
 unsigned long lastHeartbeat = 0;
-const unsigned long heartbeatInterval = 30000;
+
+// ========== HELPER FUNCTION FOR READINGS ==========
+void addReading(JsonArray& readings, const char* type, float value, const char* unit) {
+  if (!isnan(value) && !isinf(value)) {
+    JsonObject reading = readings.createNestedObject();
+    reading["type"] = type;
+    reading["value"] = value;
+    reading["unit"] = unit;
+  }
+}
 
 // ========== SETUP ==========
 void setup() {
@@ -292,9 +365,10 @@ void setup() {
   delay(1000);
 
   Serial.println();
-  Serial.println("===========================================");
-  Serial.println("   AquaNexus ESP32 - " DEVICE_NAME);
-  Serial.println("===========================================");
+  Serial.println("╔════════════════════════════════════════════╗");
+  Serial.println("║      AquaNexus ESP32 Firmware v2.0.0       ║");
+  Serial.println("║      Device: " DEVICE_NAME);
+  Serial.println("╚════════════════════════════════════════════╝");
   Serial.println();
 
   // Initialize LED
@@ -302,26 +376,29 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
 
   // Get device MAC address
+  #ifdef DEVICE_MAC
+  deviceMac = DEVICE_MAC;
+  #else
   deviceMac = WiFi.macAddress();
+  #endif
   Serial.println("Device MAC: " + deviceMac);
 
-  // Initialize preferences
-  preferences.begin("aquanexus", false);
-  loadCredentials();
+  // Load API key
+  #ifdef API_KEY
+  apiKey = API_KEY;
+  if (apiKey.length() > 0) {
+    Serial.println("API Key configured: " + apiKey.substring(0, 8) + "...");
+  } else {
+    Serial.println("WARNING: No API key configured!");
+    Serial.println("Get your API key from the AquaNexus dashboard.");
+  }
+  #endif
 
   // ========== WiFiManager Setup (Provisioning Mode) ==========
-  // This creates a captive portal if WiFi is not configured
-  // The user connects to "AquaNexus-Setup" hotspot to configure WiFi
-
-  wifiManager.setConfigPortalTimeout(180); // 3 minute timeout
+  wifiManager.setConfigPortalTimeout(180);
   wifiManager.setAPCallback(configModeCallback);
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-  // Custom parameters can be added here if needed
-  // WiFiManagerParameter custom_server("server", "Server Host", SERVER_HOST, 40);
-  // wifiManager.addParameter(&custom_server);
-
-  // Try to connect, if it fails, start config portal
   Serial.println("Connecting to WiFi...");
   Serial.println("If this fails, a setup hotspot will be created.");
   Serial.println();
@@ -333,12 +410,15 @@ void setup() {
     ESP.restart();
   }
 
-  // If we get here, we're connected to WiFi
+  // WiFi Connected
   wifiConnected = true;
   Serial.println();
-  Serial.println("WiFi connected successfully!");
-  Serial.println("IP address: " + WiFi.localIP().toString());
-  Serial.println("Signal strength: " + String(WiFi.RSSI()) + " dBm");
+  Serial.println("✓ WiFi connected successfully!");
+  Serial.println("  IP address: " + WiFi.localIP().toString());
+  Serial.println("  Signal strength: " + String(WiFi.RSSI()) + " dBm");
+
+  // Configure secure client for HTTPS
+  secureClient.setInsecure(); // For testing - use proper certificates in production
 
   // Blink LED to indicate successful connection
   for (int i = 0; i < 3; i++) {
@@ -351,28 +431,20 @@ void setup() {
   // Initialize sensors
   initializeSensors();
 
-  // Register device with server if not provisioned
-  if (!isProvisioned) {
-    Serial.println("Device not provisioned. Starting registration...");
-    performDeviceRegistration();
-  } else {
-    Serial.println("Device already provisioned.");
-    Serial.println("Device ID: " + deviceId);
-  }
-
-  // Connect to server
-  if (isProvisioned && USE_WEBSOCKET) {
-    connectWebSocket();
-  }
+  ${config.useAbly ? `// Connect to Ably MQTT
+  setupAblyMQTT();` : ''}
 
   #if ENABLE_OTA
   setupOTA();
   #endif
 
   Serial.println();
-  Serial.println("Setup complete! Starting main loop...");
-  Serial.println("===========================================");
+  Serial.println("✓ Setup complete! Starting main loop...");
+  Serial.println("════════════════════════════════════════════");
   Serial.println();
+
+  // Send initial heartbeat
+  sendHeartbeat();
 }
 
 // ========== MAIN LOOP ==========
@@ -383,20 +455,21 @@ void loop() {
     return;
   }
 
-  // WebSocket loop
-  if (USE_WEBSOCKET && isProvisioned) {
-    webSocket.loop();
+  ${config.useAbly ? `// Handle MQTT
+  if (!mqtt.connected()) {
+    reconnectMQTT();
   }
+  mqtt.loop();` : ''}
 
   // Read sensors at specified interval
-  if (millis() - lastSensorRead >= SENSOR_INTERVAL && isProvisioned) {
+  if (millis() - lastSensorRead >= SENSOR_INTERVAL) {
     readAllSensors();
     sendSensorData();
     lastSensorRead = millis();
   }
 
   // Send heartbeat
-  if (millis() - lastHeartbeat >= heartbeatInterval && isProvisioned) {
+  if (millis() - lastHeartbeat >= HEARTBEAT_INTERVAL) {
     sendHeartbeat();
     lastHeartbeat = millis();
   }
@@ -406,7 +479,7 @@ void loop() {
   #endif
 
   #if ENABLE_DEEP_SLEEP
-  if (millis() > 60000) { // After 1 minute, enter deep sleep
+  if (millis() > 60000) {
     enterDeepSleep();
   }
   #endif
@@ -417,257 +490,163 @@ void loop() {
 // ========== WiFiManager CALLBACKS ==========
 void configModeCallback(WiFiManager *myWiFiManager) {
   Serial.println();
-  Serial.println("===========================================");
-  Serial.println("  WIFI SETUP MODE ACTIVATED");
-  Serial.println("===========================================");
+  Serial.println("╔════════════════════════════════════════════╗");
+  Serial.println("║        WIFI SETUP MODE ACTIVATED           ║");
+  Serial.println("╚════════════════════════════════════════════╝");
   Serial.println();
-  Serial.println("1. Connect to WiFi network: AquaNexus-Setup");
+  Serial.println("1. Connect to WiFi: AquaNexus-Setup");
   Serial.println("2. Password: aquanexus123");
-  Serial.println("3. Open browser and go to: 192.168.4.1");
-  Serial.println("4. Select your WiFi network and enter password");
+  Serial.println("3. Open browser: 192.168.4.1");
+  Serial.println("4. Select your WiFi network");
   Serial.println();
   Serial.println("Hotspot IP: " + WiFi.softAPIP().toString());
-  Serial.println("===========================================");
+  Serial.println("════════════════════════════════════════════");
 
-  // Slow blink to indicate config mode
   digitalWrite(LED_PIN, HIGH);
 }
 
 void saveConfigCallback() {
-  Serial.println("WiFi configuration saved!");
+  Serial.println("✓ WiFi configuration saved!");
 }
 
 // ========== SENSOR INITIALIZATION ==========
 void initializeSensors() {
   Serial.println("Initializing sensors...");
 ${setupCode}
-  Serial.println("All sensors initialized.");
+  Serial.println("✓ All sensors initialized.");
 }
 
 // ========== SENSOR READING ==========
 void readAllSensors() {
+  Serial.println("Reading sensors...");
 ${loopCode}
 }
 
 // ========== DATA TRANSMISSION ==========
+// Send sensor data to AquaNexus API
+// API Format: POST /api/telemetry
+// {
+//   "apiKey": "your-api-key",
+//   "deviceMac": "AA:BB:CC:DD:EE:FF",
+//   "readingType": "fish" | "plant",
+//   "readings": [{ "type": "temperature", "value": 25.5, "unit": "°C" }]
+// }
 void sendSensorData() {
+  if (apiKey.length() == 0) {
+    Serial.println("ERROR: No API key configured. Cannot send data.");
+    return;
+  }
+
   DynamicJsonDocument doc(2048);
 
-  doc["type"] = "sensor_data";
-  doc["deviceId"] = deviceId;
+  // Build payload matching AquaNexus telemetry API format
+  doc["apiKey"] = apiKey;
   doc["deviceMac"] = deviceMac;
-  doc["deviceType"] = DEVICE_TYPE;
-  doc["timestamp"] = millis();
+  doc["readingType"] = DEVICE_TYPE;
+  doc["timestamp"] = getISOTimestamp();
 
-${jsonPayload}
+  // Create readings array
+  JsonArray readings = doc.createNestedArray("readings");
+
+  // Add sensor readings to array
+${readingsArrayCode}
 
   String payload;
   serializeJson(doc, payload);
 
-  if (USE_WEBSOCKET && webSocket.isConnected()) {
-    webSocket.sendTXT(payload);
-    Serial.println("Data sent via WebSocket");
-  } else {
-    sendViaHTTP(payload);
+  Serial.println("Sending data to AquaNexus...");
+  Serial.println("Payload: " + payload);
+
+  ${config.useAbly ? `
+  // Send via MQTT if connected
+  if (mqtt.connected()) {
+    String topic = "aquanexus/" + deviceMac + "/telemetry";
+    if (mqtt.publish(topic.c_str(), payload.c_str())) {
+      Serial.println("✓ Data sent via MQTT");
+      blinkLED(1);
+      return;
+    }
   }
+  ` : ''}
+
+  // Send via HTTPS
+  sendViaHTTPS(payload);
 }
 
-void sendViaHTTP(String payload) {
-  String url = "http://" + String(SERVER_HOST) + ":" + String(SERVER_PORT) + "/api/telemetry";
-
-  http.begin(url);
+void sendViaHTTPS(String payload) {
+  http.begin(secureClient, API_ENDPOINT);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("Authorization", "Bearer " + apiKey);
+  http.setTimeout(10000);
 
   int httpCode = http.POST(payload);
 
-  if (httpCode == 200) {
-    Serial.println("Data sent via HTTP");
+  if (httpCode == 200 || httpCode == 201) {
+    String response = http.getString();
+    Serial.println("✓ Data sent via HTTPS");
+    Serial.println("Response: " + response);
+    blinkLED(1);
+  } else if (httpCode > 0) {
+    String response = http.getString();
+    Serial.println("✗ HTTP Error " + String(httpCode) + ": " + response);
+    blinkLED(3);
   } else {
-    Serial.println("HTTP POST failed: " + String(httpCode));
+    Serial.println("✗ Connection failed: " + http.errorToString(httpCode));
+    blinkLED(5);
   }
 
   http.end();
 }
 
 void sendHeartbeat() {
+  if (apiKey.length() == 0) {
+    return;
+  }
+
   DynamicJsonDocument doc(512);
 
-  doc["type"] = "heartbeat";
-  doc["deviceId"] = deviceId;
+  doc["apiKey"] = apiKey;
   doc["deviceMac"] = deviceMac;
-  doc["timestamp"] = millis();
-  doc["uptime"] = millis() / 1000;
-  doc["freeHeap"] = ESP.getFreeHeap();
-  doc["wifiRSSI"] = WiFi.RSSI();
-  doc["wifiSSID"] = WiFi.SSID();
+  doc["readingType"] = "heartbeat";
+  doc["timestamp"] = getISOTimestamp();
+  doc["status"] = "online";
 
   String payload;
   serializeJson(doc, payload);
 
-  if (USE_WEBSOCKET && webSocket.isConnected()) {
-    webSocket.sendTXT(payload);
+  ${config.useAbly ? `
+  if (mqtt.connected()) {
+    String topic = "aquanexus/" + deviceMac + "/heartbeat";
+    mqtt.publish(topic.c_str(), payload.c_str());
+    Serial.println("✓ Heartbeat sent via MQTT");
+    return;
   }
+  ` : ''}
 
-  Serial.println("Heartbeat sent");
-}
-
-// ========== DEVICE REGISTRATION ==========
-void performDeviceRegistration() {
-  DynamicJsonDocument doc(1024);
-
-  doc["deviceMac"] = deviceMac;
-  doc["deviceName"] = DEVICE_NAME;
-  doc["deviceType"] = DEVICE_TYPE;
-  doc["firmwareVersion"] = "2.0.0";
-
-  String payload;
-  serializeJson(doc, payload);
-
-  String url = "http://" + String(SERVER_HOST) + ":" + String(SERVER_PORT) + "/api/devices";
-
-  http.begin(url);
+  // Send via HTTPS
+  http.begin(secureClient, API_ENDPOINT);
   http.addHeader("Content-Type", "application/json");
+  http.setTimeout(5000);
 
   int httpCode = http.POST(payload);
-
   if (httpCode == 200 || httpCode == 201) {
-    String response = http.getString();
-
-    DynamicJsonDocument responseDoc(1024);
-    deserializeJson(responseDoc, response);
-
-    if (responseDoc.containsKey("id")) {
-      deviceId = responseDoc["id"].as<String>();
-      apiKey = responseDoc["apiKey"].as<String>();
-
-      // Save credentials
-      preferences.putString("deviceId", deviceId);
-      preferences.putString("apiKey", apiKey);
-
-      isProvisioned = true;
-      Serial.println("Device registered successfully!");
-      Serial.println("Device ID: " + deviceId);
-    }
-  } else {
-    Serial.println("Registration failed: " + String(httpCode));
+    Serial.println("✓ Heartbeat sent");
   }
-
   http.end();
 }
 
-// ========== CREDENTIAL MANAGEMENT ==========
-void loadCredentials() {
-  deviceId = preferences.getString("deviceId", "");
-  apiKey = preferences.getString("apiKey", "");
-
-  isProvisioned = (deviceId.length() > 0 && apiKey.length() > 0);
-
-  if (isProvisioned) {
-    Serial.println("Loaded stored credentials");
-    Serial.println("Device ID: " + deviceId);
-  }
+// ========== UTILITY FUNCTIONS ==========
+String getISOTimestamp() {
+  // Returns a timestamp string (millis since boot - for real timestamps, use NTP)
+  unsigned long ms = millis();
+  return String(ms);
 }
 
-void clearCredentials() {
-  preferences.clear();
-  deviceId = "";
-  apiKey = "";
-  isProvisioned = false;
-  Serial.println("Credentials cleared");
-}
-
-// ========== WEBSOCKET ==========
-void connectWebSocket() {
-  Serial.println("Connecting to WebSocket server...");
-
-  webSocket.begin(SERVER_HOST, SERVER_PORT, "/ws");
-  webSocket.onEvent(webSocketEvent);
-  webSocket.setReconnectInterval(5000);
-}
-
-void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
-  switch (type) {
-    case WStype_DISCONNECTED:
-      Serial.println("WebSocket disconnected");
-      break;
-
-    case WStype_CONNECTED:
-      Serial.println("WebSocket connected");
-      // Send authentication
-      {
-        DynamicJsonDocument authDoc(256);
-        authDoc["type"] = "auth";
-        authDoc["deviceId"] = deviceId;
-        authDoc["apiKey"] = apiKey;
-
-        String authMsg;
-        serializeJson(authDoc, authMsg);
-        webSocket.sendTXT(authMsg);
-      }
-      break;
-
-    case WStype_TEXT:
-      handleWebSocketMessage(String((char *)payload));
-      break;
-
-    case WStype_ERROR:
-      Serial.println("WebSocket error");
-      break;
-
-    default:
-      break;
-  }
-}
-
-void handleWebSocketMessage(String message) {
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, message);
-
-  String type = doc["type"].as<String>();
-
-  if (type == "command") {
-    String command = doc["command"].as<String>();
-    handleCommand(command, doc);
-  } else if (type == "auth_success") {
-    Serial.println("WebSocket authentication successful");
-  }
-}
-
-void handleCommand(String command, DynamicJsonDocument &doc) {
-  if (command == "restart") {
-    Serial.println("Restart command received");
-    delay(1000);
-    ESP.restart();
-  } else if (command == "reset_wifi") {
-    Serial.println("WiFi reset command received");
-    wifiManager.resetSettings();
-    delay(1000);
-    ESP.restart();
-  } else if (command == "get_status") {
-    sendDeviceStatus();
-  }
-}
-
-void sendDeviceStatus() {
-  DynamicJsonDocument doc(512);
-
-  doc["type"] = "device_status";
-  doc["deviceId"] = deviceId;
-  doc["deviceMac"] = deviceMac;
-  doc["deviceType"] = DEVICE_TYPE;
-  doc["deviceName"] = DEVICE_NAME;
-  doc["wifiSSID"] = WiFi.SSID();
-  doc["wifiRSSI"] = WiFi.RSSI();
-  doc["ipAddress"] = WiFi.localIP().toString();
-  doc["freeHeap"] = ESP.getFreeHeap();
-  doc["uptime"] = millis() / 1000;
-
-  String payload;
-  serializeJson(doc, payload);
-
-  if (webSocket.isConnected()) {
-    webSocket.sendTXT(payload);
+void blinkLED(int times) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(50);
+    digitalWrite(LED_PIN, LOW);
+    delay(50);
   }
 }
 
@@ -681,6 +660,58 @@ void handleWiFiReconnection() {
     lastReconnectAttempt = millis();
   }
 }
+
+${config.useAbly ? `
+// ========== ABLY MQTT ==========
+void setupAblyMQTT() {
+  ablyClientId = "aquanexus-" + deviceMac;
+  ablyClientId.replace(":", "");
+
+  mqtt.setServer(ABLY_HOST, ABLY_PORT);
+  mqtt.setCallback(mqttCallback);
+
+  reconnectMQTT();
+}
+
+void reconnectMQTT() {
+  if (!mqtt.connected()) {
+    Serial.println("Connecting to Ably MQTT...");
+
+    // For Ably, username is API key name, password is API key secret
+    // Use device MAC as client ID
+    if (mqtt.connect(ablyClientId.c_str())) {
+      Serial.println("✓ Connected to Ably MQTT");
+
+      // Subscribe to commands topic
+      String cmdTopic = "aquanexus/" + deviceMac + "/commands";
+      mqtt.subscribe(cmdTopic.c_str());
+    } else {
+      Serial.println("✗ Ably MQTT connection failed, rc=" + String(mqtt.state()));
+    }
+  }
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  String message;
+  for (unsigned int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+
+  Serial.println("MQTT message received: " + message);
+
+  DynamicJsonDocument doc(512);
+  deserializeJson(doc, message);
+
+  String command = doc["command"].as<String>();
+  if (command == "restart") {
+    Serial.println("Restart command received");
+    ESP.restart();
+  } else if (command == "reset_wifi") {
+    wifiManager.resetSettings();
+    ESP.restart();
+  }
+}
+` : ''}
 
 #if ENABLE_OTA
 // ========== OTA UPDATE ==========
@@ -704,7 +735,7 @@ void setupOTA() {
   });
 
   ArduinoOTA.begin();
-  Serial.println("OTA updates enabled");
+  Serial.println("✓ OTA updates enabled");
 }
 #endif
 
