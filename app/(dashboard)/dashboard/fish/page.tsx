@@ -8,7 +8,7 @@ import { FishSensorCards } from '@/components/fish/sensor-cards';
 import { FishCharts } from '@/components/fish/charts';
 import { RealTimeIndicator } from '@/components/dashboard/realtime-indicator';
 import { FishDashboardClient } from './client';
-import { TimePeriod, getPeriodMilliseconds, getPeriodReadingLimit } from '@/components/dashboard/period-selector';
+import { TimePeriod, getPeriodMilliseconds, getPeriodReadingLimit } from '@/lib/utils/period';
 
 async function getFishData(userId: string, selectedDeviceId?: string, period: TimePeriod = '1d') {
   // Get all fish devices

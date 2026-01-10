@@ -8,7 +8,7 @@ import { PlantSensorCards } from '@/components/plants/sensor-cards';
 import { PlantCharts } from '@/components/plants/charts';
 import { RealTimeIndicator } from '@/components/dashboard/realtime-indicator';
 import { PlantDashboardClient } from './client';
-import { TimePeriod, getPeriodMilliseconds, getPeriodReadingLimit } from '@/components/dashboard/period-selector';
+import { TimePeriod, getPeriodMilliseconds, getPeriodReadingLimit } from '@/lib/utils/period';
 
 async function getPlantData(userId: string, selectedDeviceId?: string, period: TimePeriod = '1d') {
   // Get all plant devices
