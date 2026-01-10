@@ -3,9 +3,19 @@ import { getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { devices, fishReadings, plantReadings } from '@/lib/db/schema';
 import { eq, desc, count } from 'drizzle-orm';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DeviceList } from '@/components/devices/device-list';
 import { RegisterDeviceButton } from '@/components/devices/register-device-button';
+import {
+  Cpu,
+  Wifi,
+  WifiOff,
+  AlertTriangle,
+  Activity,
+  Radio,
+  Sparkles,
+  ArrowRight,
+} from 'lucide-react';
+import Link from 'next/link';
 
 async function getDevicesData(userId: string) {
   const userDevices = await db
@@ -14,7 +24,6 @@ async function getDevicesData(userId: string) {
     .where(eq(devices.userId, userId))
     .orderBy(desc(devices.createdAt));
 
-  // Get reading counts for each device
   const devicesWithStats = await Promise.all(
     userDevices.map(async (device) => {
       let readingCount = 0;
@@ -52,62 +61,178 @@ export default async function DevicesPage() {
 
   const devicesData = await getDevicesData(session.userId);
 
+  const totalDevices = devicesData.length;
+  const onlineDevices = devicesData.filter((d) => d.status === 'online').length;
+  const offlineDevices = devicesData.filter((d) => d.status === 'offline').length;
+  const warningDevices = devicesData.filter((d) => d.status === 'warning').length;
+  const virtualDevices = devicesData.filter((d) => d.deviceMac.startsWith('VIRTUAL:')).length;
+  const totalReadings = devicesData.reduce((sum, d) => sum + d.readingCount, 0);
+
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Devices</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage your IoT devices and monitor their status
+    <div className="space-y-8">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            Device Fleet
+          </h1>
+          <p className="text-gray-500">
+            Monitor and manage your aquaponics sensor network
           </p>
         </div>
         <RegisterDeviceButton />
       </div>
 
-      {/* Stats overview */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Devices</CardDescription>
-            <CardTitle className="text-3xl">{devicesData.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Online</CardDescription>
-            <CardTitle className="text-3xl text-emerald-600">
-              {devicesData.filter((d) => d.status === 'online').length}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Offline</CardDescription>
-            <CardTitle className="text-3xl text-gray-400">
-              {devicesData.filter((d) => d.status === 'offline').length}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+      {/* Stats Overview - Premium Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Total Devices */}
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 p-5 transition-all duration-300 hover:shadow-xl hover:shadow-gray-900/20">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm">
+                <Cpu className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Total</span>
+            </div>
+            <div className="space-y-1">
+              <p className="text-4xl font-bold text-white tabular-nums">{totalDevices}</p>
+              <p className="text-sm text-gray-400">Registered devices</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Online Devices */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 p-5 transition-all duration-300 hover:shadow-xl hover:border-emerald-100">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-emerald-100">
+                <Wifi className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                <span className="text-xs font-medium text-emerald-600 uppercase tracking-wider">Live</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-4xl font-bold text-gray-900 tabular-nums">{onlineDevices}</p>
+              <p className="text-sm text-gray-500">Online & reporting</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Offline Devices */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 p-5 transition-all duration-300 hover:shadow-xl hover:border-gray-200">
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gray-100">
+                <WifiOff className="h-5 w-5 text-gray-500" />
+              </div>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Idle</span>
+            </div>
+            <div className="space-y-1">
+              <p className="text-4xl font-bold text-gray-900 tabular-nums">{offlineDevices}</p>
+              <p className="text-sm text-gray-500">Currently offline</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Virtual Devices */}
+        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-900 p-5 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/20">
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-400/20 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-indigo-400/20 via-transparent to-transparent" />
+          </div>
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm">
+                <Radio className="h-5 w-5 text-purple-300" />
+              </div>
+              <span className="text-xs font-medium text-purple-300 uppercase tracking-wider">Simulated</span>
+            </div>
+            <div className="space-y-1">
+              <p className="text-4xl font-bold text-white tabular-nums">{virtualDevices}</p>
+              <p className="text-sm text-purple-300">Virtual devices</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Device list */}
-      {devicesData.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <div className="mx-auto h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-4">
-              <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-              </svg>
+      {/* Quick Stats Bar */}
+      {totalDevices > 0 && (
+        <div className="flex flex-wrap items-center gap-6 p-4 rounded-2xl bg-gradient-to-r from-gray-50 to-white border border-gray-100">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-blue-500" />
+            <span className="text-sm text-gray-600">
+              <span className="font-semibold text-gray-900">{totalReadings.toLocaleString()}</span> total readings
+            </span>
+          </div>
+          {warningDevices > 0 && (
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <span className="text-sm text-gray-600">
+                <span className="font-semibold text-amber-600">{warningDevices}</span> need attention
+              </span>
             </div>
-            <h3 className="text-lg font-medium text-gray-900">No Devices Registered</h3>
-            <p className="mt-2 text-sm text-gray-500">
-              Register your first ESP32 device to start monitoring your aquaponics system.
+          )}
+          {virtualDevices > 0 && (
+            <Link
+              href="/dashboard/simulator"
+              className="ml-auto flex items-center gap-2 text-sm text-purple-600 hover:text-purple-700 transition-colors"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Manage Virtual Streaming</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* Device List */}
+      {devicesData.length === 0 ? (
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-50 via-white to-gray-50 border border-gray-100 p-12 text-center">
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-blue-100/50 to-transparent rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-purple-100/50 to-transparent rounded-full translate-y-1/2 -translate-x-1/2" />
+
+          <div className="relative">
+            <div className="mx-auto h-20 w-20 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center mb-6 shadow-lg shadow-blue-100">
+              <Cpu className="h-10 w-10 text-blue-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">No Devices Yet</h3>
+            <p className="text-gray-500 max-w-md mx-auto mb-8">
+              Register your first ESP32 device to start monitoring your aquaponics system with real-time sensor data.
             </p>
-          </CardContent>
-        </Card>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <RegisterDeviceButton />
+              <Link
+                href="/dashboard/settings"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-purple-200 text-purple-700 font-medium hover:bg-purple-50 transition-colors"
+              >
+                <Radio className="h-4 w-4" />
+                Enable Virtual Devices
+              </Link>
+            </div>
+          </div>
+        </div>
       ) : (
-        <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100 rounded-lg" />}>
+        <Suspense
+          fallback={
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-64 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 animate-pulse"
+                  style={{ animationDelay: `${i * 0.1}s` }}
+                />
+              ))}
+            </div>
+          }
+        >
           <DeviceList devices={devicesData} />
         </Suspense>
       )}

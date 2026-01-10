@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DeviceSettings } from '@/components/devices/device-settings';
 import Link from 'next/link';
 import { ChevronLeft, Fish, Leaf, Activity, AlertTriangle, Clock, Cpu } from 'lucide-react';
+import { formatReadingInterval } from '@/lib/utils/device-intervals';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -170,7 +171,7 @@ export default async function DeviceDetailPage({ params }: PageProps) {
               <Clock className="mr-2 h-4 w-4" />
               Reading Interval
             </CardDescription>
-            <CardTitle className="text-2xl">{device.readingInterval}s</CardTitle>
+            <CardTitle className="text-2xl">{formatReadingInterval(device.readingInterval)}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
@@ -195,6 +196,7 @@ export default async function DeviceDetailPage({ params }: PageProps) {
             <DeviceSettings
               deviceId={device.id}
               deviceName={device.deviceName}
+              deviceMac={device.deviceMac}
               readingInterval={device.readingInterval}
             />
           </CardContent>

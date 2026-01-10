@@ -4,6 +4,7 @@ import { devices } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 import { generateApiKey } from '@/lib/utils';
+import { getDeviceInterval } from '@/lib/utils/device-intervals';
 
 export async function GET() {
   try {
@@ -69,6 +70,9 @@ export async function POST(request: Request) {
     // Generate API key for the device
     const apiKey = generateApiKey();
 
+    // Determine reading interval - virtual devices use 5 hours (18000s) to match dataset
+    const readingInterval = getDeviceInterval(deviceMac);
+
     const newDevice = await db
       .insert(devices)
       .values({
@@ -78,7 +82,7 @@ export async function POST(request: Request) {
         deviceType,
         apiKey,
         status: 'offline',
-        readingInterval: 300, // 5 minutes default
+        readingInterval,
       })
       .returning();
 
