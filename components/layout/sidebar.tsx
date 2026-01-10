@@ -16,6 +16,8 @@ import {
   CircuitBoard,
   AlertTriangle,
   WifiOff,
+  TrendingUp,
+  Radio,
 } from 'lucide-react';
 
 interface SystemStatus {
@@ -32,9 +34,11 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, description: 'Overview & analytics' },
   { name: 'Fish Environment', href: '/dashboard/fish', icon: Fish, description: 'Monitor fish tanks' },
   { name: 'Plant Environment', href: '/dashboard/plants', icon: Leaf, description: 'Track plant growth' },
+  { name: 'Forecast', href: '/dashboard/forecast', icon: TrendingUp, description: 'LSTM predictions' },
   { name: 'AI Analysis', href: '/dashboard/ai', icon: Brain, description: 'Dual AI consensus' },
   { name: 'Devices', href: '/dashboard/devices', icon: Cpu, description: 'ESP32 management' },
   { name: 'Firmware', href: '/dashboard/firmware', icon: CircuitBoard, description: 'Configure & flash' },
+  { name: 'Simulator', href: '/dashboard/simulator', icon: Radio, description: 'Virtual ESP32' },
   { name: 'Data Import', href: '/dashboard/import', icon: Upload, description: 'CSV & JSON import' },
 ];
 
