@@ -1,0 +1,50 @@
+{
+  "model_type": "height",
+  "version": "20260110_123606",
+  "prediction_horizon": "short",
+  "model_path": "./trained_models/height_short_20260110_123606",
+  "data_type": "plant",
+  "training": {
+    "epochs_trained": 22,
+    "final_loss": 0.0076885768212378025,
+    "final_val_loss": 0.004443304147571325,
+    "final_mae": 0.06768935173749924,
+    "final_val_mae": 0.039970774203538895
+  },
+  "evaluation": {
+    "val_loss": 0.06392070651054382,
+    "val_mae": 0.19552333652973175,
+    "mse": 0.06392070303558336,
+    "rmse": 0.2528254398504695,
+    "mape": 19.675660207204864,
+    "r2": 0.5747957549462827
+  },
+  "hyperparameters": {
+    "sequence_length": 24,
+    "prediction_steps": 12,
+    "units": 128,
+    "features": [
+      "height",
+      "temperature",
+      "humidity",
+      "pressure"
+    ],
+    "target": "height",
+    "epochs": 22,
+    "batch_size": 32,
+    "patience": 15
+  },
+  "data_info": {
+    "train_samples": 405,
+    "val_samples": 408,
+    "train_date_range": [
+      "2024-03-01 00:10:00",
+      "2024-05-31 05:13:00"
+    ],
+    "val_date_range": [
+      "2024-06-01 00:15:00",
+      "2024-08-31 22:08:00"
+    ]
+  },
+  "trained_at": "2026-01-10T12:36:13.924680"
+}

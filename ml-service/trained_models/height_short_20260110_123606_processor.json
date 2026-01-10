@@ -1,0 +1,1 @@
+{"sequence_length": 24, "prediction_steps": 12, "feature_columns": ["height", "temperature", "humidity", "pressure"], "target_column": "height", "scaler_min": [10.0, 30.12, 60.78, 100196.82], "scaler_max": [17.0, 33.29, 80.67, 100223.59], "target_scaler_min": [10.0], "target_scaler_max": [17.0]}

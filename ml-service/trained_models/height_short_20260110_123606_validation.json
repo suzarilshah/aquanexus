@@ -1,0 +1,41 @@
+{
+  "model_type": "height",
+  "horizon": "short",
+  "model_path": "trained_models/height_short_20260110_123606",
+  "validation_date": "2026-01-10T12:36:34.485144",
+  "metrics": {
+    "scaled": {
+      "mse": 0.06392070303558336,
+      "rmse": 0.2528254398504695,
+      "mae": 0.19552334349943332,
+      "mape": 19.67566049209562,
+      "r2": 0.5747957549462827
+    },
+    "actual_scale": {
+      "mse": 3.1321144516937447,
+      "rmse": 1.7697780797867695,
+      "mae": 1.3686633996324602,
+      "mape": 7.628732234788689
+    }
+  },
+  "value_ranges": {
+    "actual": {
+      "min": 11.0,
+      "max": 21.0,
+      "mean": 16.336192810457515
+    },
+    "predicted": {
+      "min": 12.155410766601562,
+      "max": 17.425783157348633,
+      "mean": 15.226749420166016
+    }
+  },
+  "samples": 408,
+  "growth_analysis": {
+    "actual_start": 12.0,
+    "actual_end": 19.0,
+    "actual_growth": 7.0,
+    "predicted_growth": 4.490636825561523,
+    "growth_error": 2.5093631744384766
+  }
+}

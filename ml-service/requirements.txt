@@ -1,0 +1,29 @@
+# AquaNexus ML Service Requirements
+# Python 3.9+ recommended
+
+# Deep Learning
+tensorflow>=2.15.0
+keras>=3.0.0
+
+# Data Processing
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# API Server (optional - for serving predictions)
+fastapi>=0.109.0
+uvicorn>=0.27.0
+pydantic>=2.5.0
+
+# Database (optional - for direct DB access)
+psycopg2-binary>=2.9.0
+sqlalchemy>=2.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+python-multipart>=0.0.6
+joblib>=1.3.0
+
+# Visualization (optional - for analysis)
+matplotlib>=3.8.0
+seaborn>=0.13.0
