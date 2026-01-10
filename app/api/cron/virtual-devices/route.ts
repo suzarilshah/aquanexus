@@ -169,9 +169,9 @@ async function sendTelemetry(
   readingType: 'fish' | 'plant',
   readings: Array<{ type: string; value: number; unit: string; timestamp: string }>
 ) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+    || 'http://localhost:3000';
 
   const response = await fetch(`${baseUrl}/api/telemetry`, {
     method: 'POST',
