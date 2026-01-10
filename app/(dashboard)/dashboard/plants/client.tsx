@@ -1,13 +1,31 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlantSensorCards } from '@/components/plants/sensor-cards';
-import { PlantCharts } from '@/components/plants/charts';
+import { PlantCharts, EnvironmentRadar, GrowthProgressRing } from '@/components/plants/charts';
 import { RealTimeIndicator } from '@/components/dashboard/realtime-indicator';
 import { DeviceSelector } from '@/components/dashboard/device-selector';
-import { Leaf, Radio, Sprout } from 'lucide-react';
+import { Sparkline } from '@/components/charts/sparkline';
+import {
+  Leaf,
+  Radio,
+  Sprout,
+  Activity,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  AlertTriangle,
+  Thermometer,
+  Droplets,
+  Gauge,
+  ArrowUp,
+  ArrowDown,
+  BarChart3,
+  Target
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Device {
   id: string;
@@ -40,6 +58,50 @@ interface PlantDashboardClientProps {
   selectedDeviceId: string | null;
 }
 
+// Calculate statistics from readings
+function calculateStats(readings: Reading[]) {
+  const validTemps = readings.map(r => r.temperature).filter((v): v is number => v !== null);
+  const validHumidity = readings.map(r => r.humidity).filter((v): v is number => v !== null);
+  const validPressure = readings.map(r => r.pressure).filter((v): v is number => v !== null);
+  const validHeight = readings.map(r => r.height).filter((v): v is number => v !== null);
+
+  const calcMinMaxAvg = (arr: number[]) => {
+    if (arr.length === 0) return { min: null, max: null, avg: null };
+    return {
+      min: Math.min(...arr),
+      max: Math.max(...arr),
+      avg: arr.reduce((a, b) => a + b, 0) / arr.length,
+    };
+  };
+
+  return {
+    temperature: calcMinMaxAvg(validTemps),
+    humidity: calcMinMaxAvg(validHumidity),
+    pressure: calcMinMaxAvg(validPressure.map(p => p / 100)), // Convert to hPa
+    height: calcMinMaxAvg(validHeight),
+    growthRate: validHeight.length >= 2 ? validHeight[0] - validHeight[validHeight.length - 1] : null,
+  };
+}
+
+// Calculate environment health score
+function calculateHealthScore(reading: Reading): number {
+  const calculateScore = (value: number | null, optimal: number, min: number, max: number): number => {
+    if (value === null) return 0;
+    const distance = Math.abs(value - optimal);
+    const maxDistance = Math.max(optimal - min, max - optimal);
+    return Math.max(0, Math.min(100, 100 - (distance / maxDistance) * 100));
+  };
+
+  const scores = [
+    calculateScore(reading.temperature, 25, 10, 40),
+    calculateScore(reading.humidity, 60, 20, 95),
+    calculateScore(reading.pressure ? reading.pressure / 100 : null, 1013, 950, 1050),
+  ];
+
+  const validScores = scores.filter(s => s > 0);
+  return validScores.length > 0 ? validScores.reduce((a, b) => a + b, 0) / validScores.length : 0;
+}
+
 export function PlantDashboardClient({
   device,
   readings,
@@ -59,6 +121,19 @@ export function PlantDashboardClient({
   };
 
   const isVirtualDevice = device?.deviceMac?.startsWith('VIRTUAL:');
+
+  // Calculate health score
+  const healthScore = useMemo(() => calculateHealthScore(latestReading), [latestReading]);
+
+  // Calculate statistics
+  const stats = useMemo(() => calculateStats(readings), [readings]);
+
+  // Get historical data for sparklines
+  const historicalData = useMemo(() => ({
+    height: readings.map(r => r.height).filter((v): v is number => v !== null).slice(0, 20),
+    temperature: readings.map(r => r.temperature).filter((v): v is number => v !== null).slice(0, 20),
+    humidity: readings.map(r => r.humidity).filter((v): v is number => v !== null).slice(0, 20),
+  }), [readings]);
 
   return (
     <div className="space-y-6">
@@ -154,6 +229,135 @@ export function PlantDashboardClient({
             </div>
           </div>
 
+          {/* Quick Stats Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Environment Health Score */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-green-600">Environment Health</span>
+                <Activity className="h-4 w-4 text-green-500" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className={cn(
+                  "text-3xl font-bold",
+                  healthScore >= 80 ? "text-green-600" :
+                  healthScore >= 60 ? "text-yellow-600" :
+                  healthScore >= 40 ? "text-orange-600" : "text-red-600"
+                )}>
+                  {healthScore.toFixed(0)}
+                </span>
+                <span className="text-sm text-green-500">/ 100</span>
+              </div>
+              <div className="mt-2 h-1.5 bg-green-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-green-400 to-emerald-500"
+                  style={{ width: `${healthScore}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Reading Count */}
+            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-200 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-blue-600">24h Readings</span>
+                <BarChart3 className="h-4 w-4 text-blue-500" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-blue-700">{readings.length}</span>
+                <span className="text-sm text-blue-500">samples</span>
+              </div>
+              {historicalData.height.length > 3 && (
+                <div className="mt-2">
+                  <Sparkline
+                    data={historicalData.height.slice().reverse()}
+                    width={80}
+                    height={20}
+                    color="#3b82f6"
+                    showArea={true}
+                    showDot={false}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Growth Rate */}
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-emerald-600">24h Growth</span>
+                <TrendingUp className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className={cn(
+                  "text-3xl font-bold",
+                  stats.growthRate !== null && stats.growthRate > 0 ? "text-emerald-600" :
+                  stats.growthRate !== null && stats.growthRate < 0 ? "text-red-600" : "text-gray-600"
+                )}>
+                  {stats.growthRate !== null ? (
+                    <>
+                      {stats.growthRate > 0 ? '+' : ''}{stats.growthRate.toFixed(2)}
+                    </>
+                  ) : '--'}
+                </span>
+                <span className="text-sm text-emerald-500">cm</span>
+              </div>
+              <div className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
+                {stats.growthRate !== null && stats.growthRate > 0 ? (
+                  <>
+                    <ArrowUp className="h-3 w-3" />
+                    <span>Growing healthy</span>
+                  </>
+                ) : stats.growthRate !== null && stats.growthRate < 0 ? (
+                  <>
+                    <ArrowDown className="h-3 w-3 text-red-500" />
+                    <span className="text-red-500">Check environment</span>
+                  </>
+                ) : (
+                  <span className="text-gray-400">No growth data</span>
+                )}
+              </div>
+            </div>
+
+            {/* Active Alerts */}
+            <div className={cn(
+              "rounded-xl border p-4 shadow-sm",
+              activeAlerts.length > 0
+                ? "bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200"
+                : "bg-gradient-to-br from-gray-50 to-slate-50 border-gray-200"
+            )}>
+              <div className="flex items-center justify-between mb-2">
+                <span className={cn(
+                  "text-xs font-medium",
+                  activeAlerts.length > 0 ? "text-amber-600" : "text-gray-600"
+                )}>Active Alerts</span>
+                <AlertTriangle className={cn(
+                  "h-4 w-4",
+                  activeAlerts.length > 0 ? "text-amber-500" : "text-gray-400"
+                )} />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className={cn(
+                  "text-3xl font-bold",
+                  activeAlerts.length > 0 ? "text-amber-700" : "text-gray-700"
+                )}>
+                  {activeAlerts.length}
+                </span>
+                <span className={cn(
+                  "text-sm",
+                  activeAlerts.length > 0 ? "text-amber-500" : "text-gray-400"
+                )}>
+                  {activeAlerts.length === 1 ? 'alert' : 'alerts'}
+                </span>
+              </div>
+              {activeAlerts.length > 0 ? (
+                <p className="mt-2 text-xs text-amber-600 truncate">
+                  {activeAlerts[0].message}
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-gray-400">All systems normal</p>
+              )}
+            </div>
+          </div>
+
           {/* Alerts Banner */}
           {activeAlerts.length > 0 && (
             <div className="rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-4">
@@ -168,37 +372,190 @@ export function PlantDashboardClient({
             </div>
           )}
 
-          {/* Sensor Cards */}
+          {/* Growth Progress & Environment Health Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Growth Progress Ring */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="h-5 w-5 text-green-500" />
+                  Growth Progress
+                </CardTitle>
+                <CardDescription>Current height vs target</CardDescription>
+              </CardHeader>
+              <CardContent className="flex justify-center py-4">
+                <GrowthProgressRing currentHeight={latestReading.height} targetHeight={50} />
+              </CardContent>
+            </Card>
+
+            {/* Environment Radar */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-emerald-500" />
+                  Environment Health
+                </CardTitle>
+                <CardDescription>Multi-metric health overview</CardDescription>
+              </CardHeader>
+              <CardContent className="flex justify-center py-4">
+                <EnvironmentRadar
+                  temperature={latestReading.temperature}
+                  humidity={latestReading.humidity}
+                  pressure={latestReading.pressure}
+                />
+              </CardContent>
+            </Card>
+
+            {/* 24h Statistics */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-blue-500" />
+                  24h Statistics
+                </CardTitle>
+                <CardDescription>Min / Max / Average</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Temperature Stats */}
+                <div className="flex items-center justify-between p-2 bg-orange-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Thermometer className="h-4 w-4 text-orange-500" />
+                    <span className="text-sm font-medium text-orange-700">Temp</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-blue-600">
+                      <ArrowDown className="h-3 w-3 inline" />
+                      {stats.temperature.min?.toFixed(1) ?? '--'}°
+                    </span>
+                    <span className="font-medium text-orange-600">
+                      {stats.temperature.avg?.toFixed(1) ?? '--'}°
+                    </span>
+                    <span className="text-red-600">
+                      <ArrowUp className="h-3 w-3 inline" />
+                      {stats.temperature.max?.toFixed(1) ?? '--'}°
+                    </span>
+                  </div>
+                </div>
+
+                {/* Humidity Stats */}
+                <div className="flex items-center justify-between p-2 bg-cyan-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Droplets className="h-4 w-4 text-cyan-500" />
+                    <span className="text-sm font-medium text-cyan-700">Humidity</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-blue-600">
+                      <ArrowDown className="h-3 w-3 inline" />
+                      {stats.humidity.min?.toFixed(0) ?? '--'}%
+                    </span>
+                    <span className="font-medium text-cyan-600">
+                      {stats.humidity.avg?.toFixed(0) ?? '--'}%
+                    </span>
+                    <span className="text-red-600">
+                      <ArrowUp className="h-3 w-3 inline" />
+                      {stats.humidity.max?.toFixed(0) ?? '--'}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pressure Stats */}
+                <div className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Gauge className="h-4 w-4 text-purple-500" />
+                    <span className="text-sm font-medium text-purple-700">Pressure</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-blue-600">
+                      <ArrowDown className="h-3 w-3 inline" />
+                      {stats.pressure.min?.toFixed(0) ?? '--'}
+                    </span>
+                    <span className="font-medium text-purple-600">
+                      {stats.pressure.avg?.toFixed(0) ?? '--'}
+                    </span>
+                    <span className="text-red-600">
+                      <ArrowUp className="h-3 w-3 inline" />
+                      {stats.pressure.max?.toFixed(0) ?? '--'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Height Stats */}
+                <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Sprout className="h-4 w-4 text-green-500" />
+                    <span className="text-sm font-medium text-green-700">Height</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-blue-600">
+                      <ArrowDown className="h-3 w-3 inline" />
+                      {stats.height.min?.toFixed(1) ?? '--'}
+                    </span>
+                    <span className="font-medium text-green-600">
+                      {stats.height.avg?.toFixed(1) ?? '--'}
+                    </span>
+                    <span className="text-red-600">
+                      <ArrowUp className="h-3 w-3 inline" />
+                      {stats.height.max?.toFixed(1) ?? '--'}cm
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sensor Cards with Sparklines */}
           <Suspense fallback={<div className="h-48 animate-pulse bg-gray-100 rounded-xl" />}>
             <PlantSensorCards
               height={latestReading.height}
               temperature={latestReading.temperature}
               humidity={latestReading.humidity}
               pressure={latestReading.pressure}
+              historicalData={readings.slice(0, 24)}
             />
           </Suspense>
 
           {/* Charts */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Growth Progress Chart */}
             <Card className="shadow-sm lg:col-span-2">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Sprout className="h-5 w-5 text-green-500" />
-                  Plant Height History
+                  Growth Progress & Rate
                 </CardTitle>
-                <CardDescription>Growth tracking over last 24 hours</CardDescription>
+                <CardDescription>Plant height tracking with growth rate indicators</CardDescription>
               </CardHeader>
               <CardContent>
                 <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100 rounded" />}>
-                  <PlantCharts data={readings} metric="height" />
+                  <PlantCharts data={readings} metric="growth" />
                 </Suspense>
               </CardContent>
             </Card>
 
+            {/* Environment Chart */}
+            <Card className="shadow-sm lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Thermometer className="h-5 w-5 text-orange-500" />
+                  Environment Conditions
+                </CardTitle>
+                <CardDescription>Temperature and humidity combined view</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100 rounded" />}>
+                  <PlantCharts data={readings} metric="environment" />
+                </Suspense>
+              </CardContent>
+            </Card>
+
+            {/* Temperature Chart */}
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Temperature History</CardTitle>
-                <CardDescription>Last 24 hours</CardDescription>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Thermometer className="h-5 w-5 text-orange-500" />
+                  Temperature History
+                </CardTitle>
+                <CardDescription>Last 24 hours • Optimal: 18-32°C</CardDescription>
               </CardHeader>
               <CardContent>
                 <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100 rounded" />}>
@@ -207,10 +564,14 @@ export function PlantDashboardClient({
               </CardContent>
             </Card>
 
+            {/* Humidity Chart */}
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Humidity History</CardTitle>
-                <CardDescription>Last 24 hours</CardDescription>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Droplets className="h-5 w-5 text-cyan-500" />
+                  Humidity History
+                </CardTitle>
+                <CardDescription>Last 24 hours • Optimal: 40-80%</CardDescription>
               </CardHeader>
               <CardContent>
                 <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100 rounded" />}>
@@ -219,10 +580,14 @@ export function PlantDashboardClient({
               </CardContent>
             </Card>
 
+            {/* Pressure Chart */}
             <Card className="shadow-sm lg:col-span-2">
               <CardHeader>
-                <CardTitle className="text-lg">Atmospheric Pressure</CardTitle>
-                <CardDescription>Pressure readings in hPa</CardDescription>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Gauge className="h-5 w-5 text-purple-500" />
+                  Atmospheric Pressure
+                </CardTitle>
+                <CardDescription>Pressure readings in hPa • Normal: ~1013 hPa</CardDescription>
               </CardHeader>
               <CardContent>
                 <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100 rounded" />}>

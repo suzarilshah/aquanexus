@@ -18,6 +18,7 @@ import {
   WifiOff,
   TrendingUp,
   Radio,
+  Bell,
 } from 'lucide-react';
 
 interface SystemStatus {
@@ -32,6 +33,7 @@ interface SidebarProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, description: 'Overview & analytics' },
+  { name: 'Alerts', href: '/dashboard/alerts', icon: Bell, description: 'System notifications' },
   { name: 'Fish Environment', href: '/dashboard/fish', icon: Fish, description: 'Monitor fish tanks' },
   { name: 'Plant Environment', href: '/dashboard/plants', icon: Leaf, description: 'Track plant growth' },
   { name: 'Forecast', href: '/dashboard/forecast', icon: TrendingUp, description: 'LSTM predictions' },

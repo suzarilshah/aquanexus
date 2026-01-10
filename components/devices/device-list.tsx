@@ -123,7 +123,10 @@ export function DeviceList({ devices }: DeviceListProps) {
 
           {/* Device Header */}
           <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-3">
+            <Link
+              href={`/dashboard/devices/${device.id}`}
+              className="flex items-center space-x-3 hover:opacity-80 transition-opacity"
+            >
               <div
                 className={cn(
                   'flex h-12 w-12 items-center justify-center rounded-xl',
@@ -146,7 +149,7 @@ export function DeviceList({ devices }: DeviceListProps) {
                 <h3 className="font-semibold text-gray-900">{device.deviceName}</h3>
                 <p className="text-xs text-gray-500 font-mono">{device.deviceMac}</p>
               </div>
-            </div>
+            </Link>
 
             {/* Status Indicator */}
             <div className="flex items-center space-x-2">
@@ -236,12 +239,6 @@ export function DeviceList({ devices }: DeviceListProps) {
             </div>
           </div>
 
-          {/* Quick Link */}
-          <Link
-            href={device.deviceType === 'fish' ? '/dashboard/fish' : '/dashboard/plants'}
-            className="absolute inset-0 rounded-xl focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            aria-label={`View ${device.deviceName} dashboard`}
-          />
         </div>
         );
       })}
