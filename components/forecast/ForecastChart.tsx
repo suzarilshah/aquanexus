@@ -199,10 +199,11 @@ export function ForecastChart({ historicalData, predictions, metricType, horizon
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
             }}
             labelStyle={{ color: '#374151', fontWeight: 500, marginBottom: '8px' }}
-            formatter={(value: number | null, name: string) => {
-              if (value === null) return ['-', name];
-              const label = name === 'historical' ? 'Historical' : name === 'predicted' ? 'Predicted' : name;
-              return [`${value.toFixed(2)} ${config.unit}`, label];
+            formatter={(value, name) => {
+              if (value === null || value === undefined) return ['-', String(name)];
+              const numValue = typeof value === 'number' ? value : parseFloat(String(value));
+              const label = name === 'historical' ? 'Historical' : name === 'predicted' ? 'Predicted' : String(name);
+              return [`${numValue.toFixed(2)} ${config.unit}`, label];
             }}
           />
 
