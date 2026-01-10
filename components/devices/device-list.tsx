@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Cpu, Fish, Leaf, MoreVertical, Trash2, Settings, Eye, Copy } from 'lucide-react';
+import { Cpu, Fish, Leaf, MoreVertical, Trash2, Settings, Eye, Copy, Radio } from 'lucide-react';
 import Link from 'next/link';
 
 interface Device {
@@ -48,29 +48,53 @@ export function DeviceList({ devices }: DeviceListProps) {
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {devices.map((device) => (
+      {devices.map((device) => {
+        const isVirtual = device.deviceMac.startsWith('VIRTUAL:');
+
+        return (
         <div
           key={device.id}
-          className="relative bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow"
+          className={cn(
+            "relative bg-white rounded-xl border p-5 hover:shadow-lg transition-all duration-200",
+            isVirtual
+              ? "border-purple-200 bg-gradient-to-br from-white to-purple-50/30"
+              : "border-gray-200"
+          )}
         >
+          {/* Virtual Badge */}
+          {isVirtual && (
+            <div className="absolute -top-2 -right-2 z-10">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg">
+                <Radio className="h-3 w-3" />
+                Virtual
+              </span>
+            </div>
+          )}
+
           {/* Device Header */}
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-3">
               <div
                 className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-lg',
-                  device.deviceType === 'fish' ? 'bg-blue-100' : 'bg-green-100'
+                  'flex h-12 w-12 items-center justify-center rounded-xl',
+                  isVirtual
+                    ? 'bg-gradient-to-br from-purple-100 to-indigo-100'
+                    : device.deviceType === 'fish'
+                      ? 'bg-gradient-to-br from-cyan-100 to-blue-100'
+                      : 'bg-gradient-to-br from-green-100 to-emerald-100'
                 )}
               >
-                {device.deviceType === 'fish' ? (
-                  <Fish className="h-5 w-5 text-blue-600" />
+                {isVirtual ? (
+                  <Radio className="h-6 w-6 text-purple-600" />
+                ) : device.deviceType === 'fish' ? (
+                  <Fish className="h-6 w-6 text-cyan-600" />
                 ) : (
-                  <Leaf className="h-5 w-5 text-green-600" />
+                  <Leaf className="h-6 w-6 text-green-600" />
                 )}
               </div>
               <div>
-                <h3 className="font-medium text-gray-900">{device.deviceName}</h3>
-                <p className="text-xs text-gray-500">{device.deviceMac}</p>
+                <h3 className="font-semibold text-gray-900">{device.deviceName}</h3>
+                <p className="text-xs text-gray-500 font-mono">{device.deviceMac}</p>
               </div>
             </div>
 
@@ -158,11 +182,12 @@ export function DeviceList({ devices }: DeviceListProps) {
           {/* Quick Link */}
           <Link
             href={device.deviceType === 'fish' ? '/dashboard/fish' : '/dashboard/plants'}
-            className="absolute inset-0 rounded-lg focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="absolute inset-0 rounded-xl focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             aria-label={`View ${device.deviceName} dashboard`}
           />
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

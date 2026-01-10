@@ -656,8 +656,13 @@ export default function SettingsPage() {
                 className="mt-1 w-full h-10 px-3 rounded-md border border-gray-200 text-sm bg-white"
               >
                 <option value="training">Training Data (plant_initial.csv, fish_initial.csv)</option>
-                <option value="validation">Validation Data</option>
+                <option value="validation">Validation Data (plant_validate.csv, fish_validate.csv)</option>
               </select>
+              <p className="mt-1 text-xs text-gray-500">
+                {virtualConfig.dataSource === 'validation'
+                  ? 'Uses validation dataset for testing LSTM predictions'
+                  : 'Uses training dataset for model training'}
+              </p>
             </div>
             <div>
               <Label htmlFor="speedMultiplier">Speed Multiplier</Label>
@@ -673,6 +678,23 @@ export default function SettingsPage() {
                 <option value="10">10x (Very Fast)</option>
               </select>
             </div>
+          </div>
+
+          {/* Quick Links */}
+          <div className="flex flex-wrap gap-3 pt-2">
+            <a
+              href="/dashboard/simulator"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 text-sm font-medium text-purple-700 hover:from-purple-100 hover:to-indigo-100 transition-colors"
+            >
+              <Radio className="h-4 w-4" />
+              Open Simulator
+            </a>
+            <a
+              href="/dashboard/devices"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              View Devices
+            </a>
           </div>
 
           {/* Action Buttons */}
@@ -730,20 +752,37 @@ export default function SettingsPage() {
       </Card>
 
       {/* Virtual Device Info */}
-      <Card className="bg-purple-50 border-purple-200">
+      <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
         <CardContent className="pt-6">
           <div className="flex items-start space-x-3">
             <div className="flex-shrink-0">
-              <Radio className="h-5 w-5 text-purple-400" />
+              <Radio className="h-5 w-5 text-purple-500" />
             </div>
-            <div className="text-sm text-purple-700">
-              <p className="font-medium">About Virtual Devices</p>
-              <p className="mt-1">
-                Virtual devices simulate ESP32 sensors by streaming pre-recorded CSV training data
-                to your dashboards. This is triggered by an external cron service (cron-job.org)
-                which calls the API endpoint periodically, ensuring data flows even when your
-                browser is closed. The data appears in real-time on your Fish and Plant dashboards.
+            <div className="text-sm text-purple-700 space-y-3">
+              <p className="font-semibold">About Virtual Devices</p>
+              <p>
+                Virtual devices simulate ESP32 sensors by streaming pre-recorded CSV data
+                to your dashboards. Data flows to Fish and Plant dashboards and feeds into
+                the LSTM model for growth predictions and forecasting.
               </p>
+
+              <div className="bg-white/60 rounded-lg p-3 border border-purple-100">
+                <p className="font-medium text-purple-800 mb-2">Two ways to stream data:</p>
+                <ol className="list-decimal list-inside space-y-1 text-purple-700">
+                  <li><strong>Manual:</strong> Use the <a href="/dashboard/simulator" className="underline">Simulator page</a> to start/stop streaming</li>
+                  <li><strong>Automatic:</strong> Set up cron-job.org to call the streaming API every minute</li>
+                </ol>
+              </div>
+
+              <div className="bg-white/60 rounded-lg p-3 border border-purple-100">
+                <p className="font-medium text-purple-800 mb-1">Automatic Streaming API:</p>
+                <code className="block text-xs bg-purple-100 px-2 py-1 rounded font-mono break-all">
+                  GET /api/virtual-devices/stream
+                </code>
+                <p className="text-xs mt-1 text-purple-600">
+                  Configure this endpoint in cron-job.org to run every minute for continuous data streaming
+                </p>
+              </div>
             </div>
           </div>
         </CardContent>

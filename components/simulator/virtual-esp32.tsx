@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Clock,
   Zap,
+  Database,
 } from 'lucide-react';
 import {
   parsePlantCSV,
@@ -50,15 +51,17 @@ interface DeviceConfig {
 interface VirtualESP32Props {
   fishDevice?: DeviceConfig;
   plantDevice?: DeviceConfig;
+  dataSource?: 'training' | 'validation';
 }
 
-export function VirtualESP32({ fishDevice, plantDevice }: VirtualESP32Props) {
+export function VirtualESP32({ fishDevice, plantDevice, dataSource = 'training' }: VirtualESP32Props) {
   // State
   const [isRunning, setIsRunning] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
   const [enableFish, setEnableFish] = useState(true);
   const [enablePlant, setEnablePlant] = useState(true);
   const [interval, setIntervalMs] = useState(2000); // 2 seconds default
+  const [currentDataSource, setCurrentDataSource] = useState<'training' | 'validation'>(dataSource);
 
   // Data state
   const [plantData, setPlantData] = useState<PlantDataRow[]>([]);
@@ -83,20 +86,24 @@ export function VirtualESP32({ fishDevice, plantDevice }: VirtualESP32Props) {
   // Refs
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load CSV data on mount
+  // Load CSV data based on data source
   useEffect(() => {
     async function loadData() {
       try {
         setIsLoading(true);
         setError(null);
 
+        // Determine which CSV files to load based on data source
+        const plantFile = currentDataSource === 'validation' ? '/plant_validate.csv' : '/plant_initial.csv';
+        const fishFile = currentDataSource === 'validation' ? '/fish_validate.csv' : '/fish_initial.csv';
+
         const [plantResponse, fishResponse] = await Promise.all([
-          fetch('/plant_initial.csv'),
-          fetch('/fish_initial.csv'),
+          fetch(plantFile),
+          fetch(fishFile),
         ]);
 
         if (!plantResponse.ok || !fishResponse.ok) {
-          throw new Error('Failed to load CSV data files');
+          throw new Error(`Failed to load ${currentDataSource} CSV data files`);
         }
 
         const [plantText, fishText] = await Promise.all([
@@ -113,6 +120,9 @@ export function VirtualESP32({ fishDevice, plantDevice }: VirtualESP32Props) {
 
         setPlantData(parsedPlant);
         setFishData(parsedFish);
+        // Reset indices when data source changes
+        setPlantIndex(0);
+        setFishIndex(0);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data');
       } finally {
@@ -121,7 +131,7 @@ export function VirtualESP32({ fishDevice, plantDevice }: VirtualESP32Props) {
     }
 
     loadData();
-  }, []);
+  }, [currentDataSource]);
 
   // Add log entry
   const addLog = useCallback(
@@ -359,7 +369,31 @@ export function VirtualESP32({ fishDevice, plantDevice }: VirtualESP32Props) {
           </div>
 
           {/* Settings Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Data Source */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-purple-500" />
+                Data Source
+              </Label>
+              <select
+                value={currentDataSource}
+                onChange={(e) => {
+                  if (!isRunning) {
+                    setCurrentDataSource(e.target.value as 'training' | 'validation');
+                  }
+                }}
+                disabled={isRunning}
+                className="w-full h-10 px-3 rounded-md border border-gray-200 text-sm bg-white disabled:bg-gray-100"
+              >
+                <option value="training">Training Data</option>
+                <option value="validation">Validation Data</option>
+              </select>
+              <p className="text-xs text-gray-500">
+                {currentDataSource === 'validation' ? 'fish/plant_validate.csv' : 'fish/plant_initial.csv'}
+              </p>
+            </div>
+
             {/* Speed Control */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
