@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Cpu, Fish, Leaf, MoreVertical, Trash2, Settings, Eye, Copy, Radio } from 'lucide-react';
+import { Cpu, Fish, Leaf, MoreVertical, Trash2, Settings, Eye, Copy, Radio, AlertTriangle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface Device {
@@ -23,13 +24,62 @@ interface DeviceListProps {
 }
 
 export function DeviceList({ devices }: DeviceListProps) {
+  const router = useRouter();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<Device | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<{ code?: string; message: string } | null>(null);
 
   const copyApiKey = async (apiKey: string, deviceId: string) => {
     await navigator.clipboard.writeText(apiKey);
     setCopiedId(deviceId);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleDeleteClick = (device: Device) => {
+    setOpenMenu(null);
+    setDeleteError(null);
+    setDeleteDialog(device);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialog) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`/api/devices/${deleteDialog.id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.code === 'VIRTUAL_DEVICE_ACTIVE') {
+          setDeleteError({
+            code: data.code,
+            message: data.message,
+          });
+        } else {
+          setDeleteError({
+            message: data.error || 'Failed to delete device',
+          });
+        }
+        return;
+      }
+
+      // Success - close dialog and refresh
+      setDeleteDialog(null);
+      router.refresh();
+    } catch (error) {
+      setDeleteError({
+        message: 'Network error. Please try again.',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const formatLastSeen = (lastSeen: Date | null) => {
@@ -148,7 +198,14 @@ export function DeviceList({ devices }: DeviceListProps) {
                         <Copy className="mr-3 h-4 w-4" />
                         {copiedId === device.id ? 'Copied!' : 'Copy API Key'}
                       </button>
-                      <button className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeleteClick(device);
+                        }}
+                        className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
                         <Trash2 className="mr-3 h-4 w-4" />
                         Delete Device
                       </button>
@@ -188,6 +245,100 @@ export function DeviceList({ devices }: DeviceListProps) {
         </div>
         );
       })}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            {deleteError?.code === 'VIRTUAL_DEVICE_ACTIVE' ? (
+              <>
+                {/* Virtual Device Warning */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
+                    <AlertTriangle className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Virtual Device Active</h3>
+                    <p className="text-sm text-gray-500">{deleteDialog.deviceName}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 mb-6">
+                  {deleteError.message}
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setDeleteDialog(null)}
+                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <Link
+                    href="/dashboard/settings"
+                    onClick={() => setDeleteDialog(null)}
+                    className="flex-1 rounded-lg bg-purple-600 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-purple-700"
+                  >
+                    Go to Settings
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Normal Delete Confirmation */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                    <Trash2 className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Delete Device</h3>
+                    <p className="text-sm text-gray-500">{deleteDialog.deviceName}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 mb-2">
+                  Are you sure you want to delete this device? This action will also delete:
+                </p>
+                <ul className="text-sm text-gray-500 mb-4 ml-4 list-disc">
+                  <li>All sensor readings ({deleteDialog.readingCount.toLocaleString()} records)</li>
+                  <li>All predictions and alerts</li>
+                  <li>Associated growth data</li>
+                </ul>
+                <p className="text-sm font-medium text-red-600 mb-6">
+                  This action cannot be undone.
+                </p>
+
+                {deleteError && !deleteError.code && (
+                  <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                    {deleteError.message}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setDeleteDialog(null)}
+                    disabled={isDeleting}
+                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteConfirm}
+                    disabled={isDeleting}
+                    className="flex-1 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      'Delete Device'
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
