@@ -52,9 +52,8 @@ type ConfigStep = 'board' | 'pins' | 'settings' | 'flash';
 function BackgroundOrbs() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-cyan-500/20 to-teal-500/20 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-emerald-500/15 to-cyan-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-br from-teal-400/10 to-emerald-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+      <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-cyan-500/10 to-teal-500/10 rounded-full blur-3xl" />
+      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 rounded-full blur-3xl" />
     </div>
   );
 }
@@ -74,7 +73,7 @@ function StepIndicator({
   return (
     <div className="relative">
       {/* Progress line */}
-      <div className="absolute top-6 left-0 right-0 h-0.5 bg-gray-200 dark:bg-gray-800" />
+      <div className="absolute top-6 left-0 right-0 h-0.5 bg-gray-200" />
       <div
         className="absolute top-6 left-0 h-0.5 bg-gradient-to-r from-cyan-500 to-teal-500 transition-all duration-500 ease-out"
         style={{ width: `${(currentIdx / (steps.length - 1)) * 100}%` }}
@@ -101,7 +100,7 @@ function StepIndicator({
                   "relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 transform",
                   isActive && "bg-gradient-to-br from-cyan-500 to-teal-600 text-white shadow-lg shadow-cyan-500/30 scale-110",
                   isCompleted && "bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg shadow-emerald-500/20",
-                  isPending && "bg-gray-100 dark:bg-gray-800 text-gray-400",
+                  isPending && "bg-gray-100 text-gray-400",
                   !isActive && !isCompleted && !isPending && "bg-gray-100 text-gray-400"
                 )}
               >
@@ -117,7 +116,7 @@ function StepIndicator({
               <span
                 className={cn(
                   "text-xs font-medium transition-colors",
-                  isActive ? "text-cyan-600 dark:text-cyan-400" : "text-gray-500"
+                  isActive ? "text-cyan-600" : "text-gray-500"
                 )}
               >
                 {step.label}
@@ -143,8 +142,8 @@ function PremiumCard({
   return (
     <div
       className={cn(
-        "relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-xl",
-        glow && "hover:border-cyan-500/50 hover:shadow-cyan-500/10",
+        "relative bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-lg",
+        glow && "hover:border-cyan-300 hover:shadow-cyan-100",
         className
       )}
     >
@@ -170,10 +169,10 @@ function BoardCard({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "relative p-5 rounded-2xl border-2 text-left transition-all duration-300 group",
+        "relative p-5 rounded-2xl border-2 text-left transition-all duration-300 group bg-white",
         isSelected
-          ? "border-cyan-500 bg-gradient-to-br from-cyan-50 to-teal-50 dark:from-cyan-950/30 dark:to-teal-950/30 shadow-lg shadow-cyan-500/20"
-          : "border-gray-200 dark:border-gray-800 hover:border-cyan-300 dark:hover:border-cyan-700 hover:shadow-md",
+          ? "border-cyan-500 bg-gradient-to-br from-cyan-50 to-teal-50 shadow-lg shadow-cyan-500/20"
+          : "border-gray-200 hover:border-cyan-300 hover:shadow-md",
         disabled && "opacity-50 cursor-not-allowed"
       )}
     >
@@ -185,7 +184,7 @@ function BoardCard({
       )}
 
       {!board.supported && (
-        <div className="absolute top-3 right-3 text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+        <div className="absolute top-3 right-3 text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
           Soon
         </div>
       )}
@@ -195,20 +194,20 @@ function BoardCard({
         "w-14 h-14 rounded-xl flex items-center justify-center mb-4 transition-all duration-300",
         isSelected
           ? "bg-gradient-to-br from-cyan-500 to-teal-600 text-white"
-          : "bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 text-gray-400 group-hover:from-cyan-100 group-hover:to-teal-100 group-hover:text-cyan-600"
+          : "bg-gradient-to-br from-gray-100 to-gray-50 text-gray-400 group-hover:from-cyan-100 group-hover:to-teal-100 group-hover:text-cyan-600"
       )}>
         <Cpu className="h-7 w-7" />
       </div>
 
-      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{board.name}</h3>
+      <h3 className="font-semibold text-gray-900 mb-1">{board.name}</h3>
       <p className="text-sm text-gray-500 mb-3 line-clamp-2">{board.description}</p>
 
       <div className="flex items-center gap-2">
         <span className={cn(
           "text-[10px] font-medium px-2 py-0.5 rounded-full",
           isSelected
-            ? "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300"
-            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+            ? "bg-cyan-100 text-cyan-700"
+            : "bg-gray-100 text-gray-600"
         )}>
           {board.category}
         </span>
@@ -232,11 +231,11 @@ function SettingsSection({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
-          <Icon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+          <Icon className="h-5 w-5 text-gray-600" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
             {title}
           </h3>
           {description && (
@@ -258,7 +257,6 @@ function ToggleOption({
   checked,
   onChange,
   iconColor = "text-gray-500",
-  bgColor = "bg-gray-50 dark:bg-gray-800/50",
   disabled = false,
   recommended = false
 }: {
@@ -269,23 +267,21 @@ function ToggleOption({
   checked: boolean;
   onChange: (checked: boolean) => void;
   iconColor?: string;
-  bgColor?: string;
   disabled?: boolean;
   recommended?: boolean;
 }) {
   return (
     <div className={cn(
-      "flex items-center justify-between p-4 rounded-xl border transition-all duration-200",
+      "flex items-center justify-between p-4 rounded-xl border transition-all duration-200 bg-white",
       checked
-        ? "border-cyan-200 dark:border-cyan-800 bg-gradient-to-r from-cyan-50/50 to-teal-50/50 dark:from-cyan-950/20 dark:to-teal-950/20"
-        : "border-gray-200 dark:border-gray-800",
-      bgColor,
+        ? "border-cyan-200 bg-gradient-to-r from-cyan-50/50 to-teal-50/50"
+        : "border-gray-200",
       disabled && "opacity-50"
     )}>
       <div className="flex items-center gap-3">
         <div className={cn(
           "w-9 h-9 rounded-lg flex items-center justify-center",
-          checked ? "bg-cyan-100 dark:bg-cyan-900/50" : "bg-gray-100 dark:bg-gray-800"
+          checked ? "bg-cyan-100" : "bg-gray-100"
         )}>
           <Icon className={cn("h-4 w-4", checked ? "text-cyan-600" : iconColor)} />
         </div>
@@ -310,7 +306,7 @@ function ToggleOption({
         disabled={disabled}
         className={cn(
           "w-11 h-6 rounded-full relative transition-colors duration-200",
-          checked ? "bg-gradient-to-r from-cyan-500 to-teal-500" : "bg-gray-200 dark:bg-gray-700",
+          checked ? "bg-gradient-to-r from-cyan-500 to-teal-500" : "bg-gray-300",
           disabled && "cursor-not-allowed"
         )}
       >
@@ -466,7 +462,7 @@ export default function FirmwareConfiguratorPage() {
                   <Terminal className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                  <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
                     Firmware Studio
                   </h1>
                   <p className="text-sm text-gray-500">
@@ -480,7 +476,7 @@ export default function FirmwareConfiguratorPage() {
               <Button
                 variant="outline"
                 onClick={() => setShowCode(!showCode)}
-                className="gap-2 rounded-xl border-gray-200 dark:border-gray-800 hover:border-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 transition-all"
+                className="gap-2 rounded-xl border-gray-200 hover:border-cyan-500 hover:bg-cyan-50 transition-all"
               >
                 {showCode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 {showCode ? 'Hide' : 'Preview'} Code
@@ -508,7 +504,7 @@ export default function FirmwareConfiguratorPage() {
                       <Cpu className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      <h2 className="text-lg font-semibold text-gray-900">
                         Select Your Microcontroller
                       </h2>
                       <p className="text-sm text-gray-500">
@@ -534,16 +530,16 @@ export default function FirmwareConfiguratorPage() {
               {/* Step 2: Pin Configuration */}
               {currentStep === 'pins' && board && (
                 <Tabs.Root defaultValue="board" className="space-y-4">
-                  <Tabs.List className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl w-fit">
+                  <Tabs.List className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
                     <Tabs.Trigger
                       value="board"
-                      className="px-4 py-2 text-sm font-medium rounded-lg transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-cyan-600"
+                      className="px-4 py-2 text-sm font-medium rounded-lg transition-all data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-cyan-600"
                     >
                       Board View
                     </Tabs.Trigger>
                     <Tabs.Trigger
                       value="breadboard"
-                      className="px-4 py-2 text-sm font-medium rounded-lg transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm data-[state=active]:text-cyan-600"
+                      className="px-4 py-2 text-sm font-medium rounded-lg transition-all data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-cyan-600"
                     >
                       Wiring Guide
                     </Tabs.Trigger>
@@ -556,7 +552,7 @@ export default function FirmwareConfiguratorPage() {
                           <CircuitBoard className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          <h2 className="text-lg font-semibold text-gray-900">
                             {board.name} Pin Configuration
                           </h2>
                           <p className="text-sm text-gray-500">
@@ -580,7 +576,7 @@ export default function FirmwareConfiguratorPage() {
                           <Waves className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          <h2 className="text-lg font-semibold text-gray-900">
                             Breadboard Wiring Diagram
                           </h2>
                           <p className="text-sm text-gray-500">
@@ -598,7 +594,7 @@ export default function FirmwareConfiguratorPage() {
               {currentStep === 'settings' && (
                 <div className="space-y-6">
                   {/* API Connection - CRITICAL */}
-                  <PremiumCard glow className="p-6 border-cyan-200 dark:border-cyan-800">
+                  <PremiumCard glow className="p-6 border-cyan-200">
                     <SettingsSection
                       title="API Connection"
                       icon={Key}
@@ -610,7 +606,7 @@ export default function FirmwareConfiguratorPage() {
                           <Label htmlFor="apiKey" className="flex items-center gap-2">
                             <Shield className="h-4 w-4 text-cyan-500" />
                             API Key
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
                               Required
                             </span>
                           </Label>
@@ -621,7 +617,7 @@ export default function FirmwareConfiguratorPage() {
                               value={apiKey}
                               onChange={(e) => setApiKey(e.target.value)}
                               placeholder="Enter your device API key from dashboard"
-                              className="pr-10 font-mono text-sm rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                              className="pr-10 font-mono text-sm rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20"
                             />
                             <button
                               type="button"
@@ -648,7 +644,7 @@ export default function FirmwareConfiguratorPage() {
                             value={deviceMac}
                             onChange={(e) => setDeviceMac(e.target.value)}
                             placeholder="AA:BB:CC:DD:EE:FF (auto-detected if empty)"
-                            className="font-mono text-sm rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                            className="font-mono text-sm rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20"
                           />
                           <p className="text-xs text-gray-500">
                             Leave empty to use ESP32&apos;s built-in MAC address
@@ -656,16 +652,16 @@ export default function FirmwareConfiguratorPage() {
                         </div>
 
                         {/* Connection Info Box */}
-                        <div className="bg-gradient-to-br from-cyan-50 to-teal-50 dark:from-cyan-950/30 dark:to-teal-950/30 rounded-xl p-4 border border-cyan-100 dark:border-cyan-900">
+                        <div className="bg-gradient-to-br from-cyan-50 to-teal-50 rounded-xl p-4 border border-cyan-100">
                           <div className="flex items-start gap-3">
                             <Lock className="h-5 w-5 text-cyan-600 flex-shrink-0 mt-0.5" />
                             <div className="space-y-2 text-sm">
-                              <p className="text-cyan-800 dark:text-cyan-200 font-medium">
+                              <p className="text-cyan-800 font-medium">
                                 Secure HTTPS Connection
                               </p>
-                              <p className="text-cyan-600 dark:text-cyan-400 text-xs">
+                              <p className="text-cyan-600 text-xs">
                                 Your device will send encrypted data to{' '}
-                                <code className="bg-cyan-100 dark:bg-cyan-900 px-1 py-0.5 rounded">
+                                <code className="bg-cyan-100 px-1 py-0.5 rounded">
                                   https://{serverHost}/api/telemetry
                                 </code>
                               </p>
@@ -687,7 +683,7 @@ export default function FirmwareConfiguratorPage() {
                             value={deviceName}
                             onChange={(e) => setDeviceName(e.target.value)}
                             placeholder="AquaNexus-Device"
-                            className="rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                            className="rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20"
                           />
                           <p className="text-xs text-gray-500">
                             WiFi hotspot name for initial setup
@@ -697,7 +693,7 @@ export default function FirmwareConfiguratorPage() {
                         <div className="space-y-2">
                           <Label htmlFor="deviceType">Monitoring Type</Label>
                           <Select.Root value={deviceType} onValueChange={(v) => setDeviceType(v as typeof deviceType)}>
-                            <Select.Trigger className="flex h-10 w-full items-center justify-between rounded-xl border border-gray-200 dark:border-gray-800 bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:border-cyan-500">
+                            <Select.Trigger className="flex h-10 w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:border-cyan-500">
                               <div className="flex items-center gap-2">
                                 {deviceType === 'fish' && <Fish className="h-4 w-4 text-cyan-500" />}
                                 {deviceType === 'plant' && <Leaf className="h-4 w-4 text-emerald-500" />}
@@ -709,17 +705,17 @@ export default function FirmwareConfiguratorPage() {
                               </Select.Icon>
                             </Select.Trigger>
                             <Select.Portal>
-                              <Select.Content className="overflow-hidden bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 z-50">
+                              <Select.Content className="overflow-hidden bg-white rounded-xl shadow-lg border border-gray-200 z-50">
                                 <Select.Viewport className="p-1">
-                                  <Select.Item value="fish" className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 dark:hover:bg-cyan-950/30 rounded-lg outline-none flex items-center gap-2">
+                                  <Select.Item value="fish" className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 rounded-lg outline-none flex items-center gap-2">
                                     <Fish className="h-4 w-4 text-cyan-500" />
                                     <Select.ItemText>Fish Tank Monitoring</Select.ItemText>
                                   </Select.Item>
-                                  <Select.Item value="plant" className="px-3 py-2 text-sm cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg outline-none flex items-center gap-2">
+                                  <Select.Item value="plant" className="px-3 py-2 text-sm cursor-pointer hover:bg-emerald-50 rounded-lg outline-none flex items-center gap-2">
                                     <Leaf className="h-4 w-4 text-emerald-500" />
                                     <Select.ItemText>Plant Grow Bed</Select.ItemText>
                                   </Select.Item>
-                                  <Select.Item value="general" className="px-3 py-2 text-sm cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-950/30 rounded-lg outline-none flex items-center gap-2">
+                                  <Select.Item value="general" className="px-3 py-2 text-sm cursor-pointer hover:bg-purple-50 rounded-lg outline-none flex items-center gap-2">
                                     <Waves className="h-4 w-4 text-purple-500" />
                                     <Select.ItemText>General Purpose</Select.ItemText>
                                   </Select.Item>
@@ -733,16 +729,16 @@ export default function FirmwareConfiguratorPage() {
                   </PremiumCard>
 
                   {/* WiFi Setup Info */}
-                  <PremiumCard className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
+                  <PremiumCard className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
                         <Wifi className="h-6 w-6 text-white" />
                       </div>
                       <div className="space-y-3">
-                        <h4 className="font-semibold text-blue-900 dark:text-blue-100">
+                        <h4 className="font-semibold text-blue-900">
                           Smart WiFi Provisioning
                         </h4>
-                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                        <p className="text-sm text-blue-700">
                           No WiFi credentials stored in code! After flashing:
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -752,11 +748,11 @@ export default function FirmwareConfiguratorPage() {
                             { step: 3, text: 'Open 192.168.4.1 in browser' },
                             { step: 4, text: 'Select your WiFi & done!' },
                           ].map(({ step, text }) => (
-                            <div key={step} className="flex items-center gap-2 bg-blue-100/50 dark:bg-blue-900/30 rounded-lg px-3 py-2">
+                            <div key={step} className="flex items-center gap-2 bg-blue-100/50 rounded-lg px-3 py-2">
                               <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">
                                 {step}
                               </span>
-                              <span className="text-xs text-blue-800 dark:text-blue-200">{text}</span>
+                              <span className="text-xs text-blue-800">{text}</span>
                             </div>
                           ))}
                         </div>
@@ -776,7 +772,7 @@ export default function FirmwareConfiguratorPage() {
                               value={serverHost}
                               onChange={(e) => setServerHost(e.target.value)}
                               placeholder="aquanexus.vercel.app"
-                              className="rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                              className="rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20"
                             />
                           </div>
                           <div className="space-y-2">
@@ -786,7 +782,7 @@ export default function FirmwareConfiguratorPage() {
                               type="number"
                               value={serverPort}
                               onChange={(e) => setServerPort(parseInt(e.target.value) || 443)}
-                              className="rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                              className="rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20"
                             />
                           </div>
                         </div>
@@ -818,7 +814,7 @@ export default function FirmwareConfiguratorPage() {
                               onChange={(e) => setSensorInterval(parseInt(e.target.value) || 5000)}
                               min={1000}
                               step={1000}
-                              className="rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20 flex-1"
+                              className="rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20 flex-1"
                             />
                             <span className="text-sm text-gray-500 whitespace-nowrap">
                               = {sensorInterval / 1000}s
@@ -858,7 +854,7 @@ export default function FirmwareConfiguratorPage() {
                               onChange={(e) => setDeepSleepDuration(parseInt(e.target.value) || 300)}
                               min={60}
                               step={60}
-                              className="rounded-xl border-gray-200 dark:border-gray-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                              className="rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20"
                             />
                           </div>
                         )}
@@ -873,18 +869,18 @@ export default function FirmwareConfiguratorPage() {
                 <div className="space-y-6">
                   {/* Warnings */}
                   {generatedFirmware.warnings.length > 0 && (
-                    <PremiumCard className="p-6 border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
+                    <PremiumCard className="p-6 border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0">
                           <AlertTriangle className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                          <h4 className="font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                          <h4 className="font-semibold text-amber-800 mb-2">
                             Configuration Warnings
                           </h4>
                           <ul className="space-y-1">
                             {generatedFirmware.warnings.map((warning, idx) => (
-                              <li key={idx} className="text-sm text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                              <li key={idx} className="text-sm text-amber-700 flex items-start gap-2">
                                 <ChevronRight className="h-4 w-4 flex-shrink-0 mt-0.5" />
                                 {warning}
                               </li>
@@ -910,7 +906,7 @@ export default function FirmwareConfiguratorPage() {
                         <Code className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        <h2 className="text-lg font-semibold text-gray-900">
                           Required Libraries
                         </h2>
                         <p className="text-sm text-gray-500">
@@ -922,9 +918,9 @@ export default function FirmwareConfiguratorPage() {
                       {generatedFirmware.libraries.map((lib) => (
                         <div
                           key={lib.name}
-                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-purple-200 dark:hover:border-purple-800 transition-colors"
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-purple-200 transition-colors"
                         >
-                          <span className="font-medium text-gray-900 dark:text-white text-sm">{lib.name}</span>
+                          <span className="font-medium text-gray-900 text-sm">{lib.name}</span>
                           {lib.github && (
                             <a
                               href={lib.github}
@@ -947,17 +943,17 @@ export default function FirmwareConfiguratorPage() {
             <div className="space-y-6">
               {/* Configuration Summary */}
               <PremiumCard className="p-6 sticky top-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-cyan-500" />
                   Summary
                 </h3>
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">Board</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{board?.name || 'None'}</span>
+                    <span className="text-sm font-medium text-gray-900">{board?.name || 'None'}</span>
                   </div>
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">Sensors</span>
                     <span className={cn(
                       "text-sm font-medium",
@@ -966,7 +962,7 @@ export default function FirmwareConfiguratorPage() {
                       {assignments.length} assigned
                     </span>
                   </div>
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">Type</span>
                     <span className="text-sm font-medium capitalize flex items-center gap-1.5">
                       {deviceType === 'fish' && <Fish className="h-3.5 w-3.5 text-cyan-500" />}
@@ -974,7 +970,7 @@ export default function FirmwareConfiguratorPage() {
                       {deviceType}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">API Key</span>
                     <span className={cn(
                       "text-sm font-medium",
@@ -994,15 +990,15 @@ export default function FirmwareConfiguratorPage() {
 
                 {/* Assigned Sensors */}
                 {assignments.length > 0 && (
-                  <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Assigned Sensors</h4>
+                  <div className="mt-6 pt-4 border-t border-gray-100">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Assigned Sensors</h4>
                     <div className="space-y-2">
                       {assignments.map((a) => (
                         <div
                           key={a.pinId}
-                          className="flex items-center justify-between text-xs p-2.5 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800 dark:to-gray-800/50 rounded-lg"
+                          className="flex items-center justify-between text-xs p-2.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg"
                         >
-                          <span className="font-medium text-gray-900 dark:text-white">{a.sensor.name}</span>
+                          <span className="font-medium text-gray-900">{a.sensor.name}</span>
                           <span className="text-gray-500 font-mono">GPIO{a.gpio}</span>
                         </div>
                       ))}
@@ -1011,7 +1007,7 @@ export default function FirmwareConfiguratorPage() {
                 )}
 
                 {/* Navigation */}
-                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
+                <div className="mt-6 pt-4 border-t border-gray-100 space-y-2">
                   {currentStep !== 'flash' && (
                     <Button
                       onClick={goToNextStep}
@@ -1026,7 +1022,7 @@ export default function FirmwareConfiguratorPage() {
                     <Button
                       variant="outline"
                       onClick={goToPrevStep}
-                      className="w-full rounded-xl h-10 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="w-full rounded-xl h-10 border-gray-200 hover:bg-gray-50"
                     >
                       Back
                     </Button>
@@ -1038,7 +1034,7 @@ export default function FirmwareConfiguratorPage() {
               {showCode && generatedFirmware && (
                 <PremiumCard className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                       <Terminal className="h-5 w-5 text-gray-500" />
                       Code
                     </h3>
@@ -1050,7 +1046,7 @@ export default function FirmwareConfiguratorPage() {
                           </Button>
                         </Tooltip.Trigger>
                         <Tooltip.Portal>
-                          <Tooltip.Content className="bg-gray-900 text-white text-xs px-2 py-1 rounded" sideOffset={5}>
+                          <Tooltip.Content className="bg-gray-800 text-white text-xs px-2 py-1 rounded" sideOffset={5}>
                             {copied ? 'Copied!' : 'Copy code'}
                           </Tooltip.Content>
                         </Tooltip.Portal>
@@ -1062,18 +1058,18 @@ export default function FirmwareConfiguratorPage() {
                           </Button>
                         </Tooltip.Trigger>
                         <Tooltip.Portal>
-                          <Tooltip.Content className="bg-gray-900 text-white text-xs px-2 py-1 rounded" sideOffset={5}>
+                          <Tooltip.Content className="bg-gray-800 text-white text-xs px-2 py-1 rounded" sideOffset={5}>
                             Download .ino
                           </Tooltip.Content>
                         </Tooltip.Portal>
                       </Tooltip.Root>
                     </div>
                   </div>
-                  <div className="max-h-80 overflow-auto bg-gray-950 rounded-xl p-4 border border-gray-800">
-                    <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
+                  <div className="max-h-80 overflow-auto bg-slate-50 rounded-xl p-4 border border-gray-200">
+                    <pre className="text-xs text-gray-700 font-mono whitespace-pre-wrap leading-relaxed">
                       {generatedFirmware.code.slice(0, 2500)}
                       {generatedFirmware.code.length > 2500 && (
-                        <span className="text-gray-500">{'\n\n'}... ({generatedFirmware.code.length - 2500} more characters)</span>
+                        <span className="text-gray-400">{'\n\n'}... ({generatedFirmware.code.length - 2500} more characters)</span>
                       )}
                     </pre>
                   </div>
