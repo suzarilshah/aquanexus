@@ -1,53 +1,155 @@
 import { getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { devices, virtualDeviceConfig } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { devices, virtualDeviceConfig, deviceStreamingSessions } from '@/lib/db/schema';
+import { eq, and, or, desc } from 'drizzle-orm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { VirtualESP32 } from '@/components/simulator/virtual-esp32';
-import { Cpu, ExternalLink, Fish, Leaf, Info, AlertTriangle } from 'lucide-react';
+import { StreamingControlPanel } from '@/components/simulator/streaming-control-panel';
+import { StreamingLogsViewer } from '@/components/simulator/streaming-logs-viewer';
+import { Cpu, Info, Fish, Leaf, ExternalLink, Database, Clock, Activity } from 'lucide-react';
 import Link from 'next/link';
+import { getDatasetSummary } from '@/lib/virtual-device/csv-parser';
+import { getSessionEvents, getRecentCronRuns } from '@/lib/virtual-device/logging-service';
+import { calculateProgress, formatDuration } from '@/lib/virtual-device/timing-calculator';
 
-async function getDevicesForSimulator(userId: string) {
-  const userDevices = await db
-    .select()
-    .from(devices)
-    .where(eq(devices.userId, userId));
-
-  // Check if virtual devices are enabled in Settings
-  const virtualConfig = await db
+async function getSimulatorData(userId: string) {
+  // Get user's virtual device config
+  const [config] = await db
     .select()
     .from(virtualDeviceConfig)
-    .where(and(
-      eq(virtualDeviceConfig.userId, userId),
-      eq(virtualDeviceConfig.enabled, true)
-    ))
+    .where(eq(virtualDeviceConfig.userId, userId))
     .limit(1);
 
-  const isVirtualEnabled = virtualConfig.length > 0;
-  const virtualFishId = virtualConfig[0]?.fishDeviceId;
-  const virtualPlantId = virtualConfig[0]?.plantDeviceId;
+  if (!config) {
+    return {
+      isConfigured: false,
+      isEnabled: false,
+      fishDevice: null,
+      plantDevice: null,
+      fishSession: null,
+      plantSession: null,
+      fishDataset: getDatasetSummary('fish'),
+      plantDataset: getDatasetSummary('plant'),
+      fishEvents: [],
+      plantEvents: [],
+      recentCronRuns: [],
+    };
+  }
 
-  const fishDevice = userDevices.find((d) => d.deviceType === 'fish');
-  const plantDevice = userDevices.find((d) => d.deviceType === 'plant');
+  // Get device details
+  let fishDevice = null;
+  let plantDevice = null;
 
-  // Check if the simulator would send to the same devices as cron
-  const wouldConflict = isVirtualEnabled && (
-    (fishDevice && virtualFishId === fishDevice.id) ||
-    (plantDevice && virtualPlantId === plantDevice.id)
-  );
+  if (config.fishDeviceId) {
+    const [device] = await db
+      .select()
+      .from(devices)
+      .where(eq(devices.id, config.fishDeviceId))
+      .limit(1);
+    fishDevice = device ? { id: device.id, name: device.deviceName, mac: device.deviceMac } : null;
+  }
+
+  if (config.plantDeviceId) {
+    const [device] = await db
+      .select()
+      .from(devices)
+      .where(eq(devices.id, config.plantDeviceId))
+      .limit(1);
+    plantDevice = device ? { id: device.id, name: device.deviceName, mac: device.deviceMac } : null;
+  }
+
+  // Get active sessions
+  let fishSession = null;
+  let plantSession = null;
+
+  if (config.fishSessionId) {
+    const [session] = await db
+      .select()
+      .from(deviceStreamingSessions)
+      .where(eq(deviceStreamingSessions.id, config.fishSessionId))
+      .limit(1);
+
+    if (session) {
+      const progress = calculateProgress(session);
+      fishSession = {
+        ...session,
+        progress: {
+          ...progress,
+          timeRemainingFormatted: formatDuration(progress.timeRemainingMs),
+          lastDataSentAgo: session.lastDataSentAt
+            ? getTimeAgo(new Date(session.lastDataSentAt))
+            : null,
+        },
+      };
+    }
+  }
+
+  if (config.plantSessionId) {
+    const [session] = await db
+      .select()
+      .from(deviceStreamingSessions)
+      .where(eq(deviceStreamingSessions.id, config.plantSessionId))
+      .limit(1);
+
+    if (session) {
+      const progress = calculateProgress(session);
+      plantSession = {
+        ...session,
+        progress: {
+          ...progress,
+          timeRemainingFormatted: formatDuration(progress.timeRemainingMs),
+          lastDataSentAgo: session.lastDataSentAt
+            ? getTimeAgo(new Date(session.lastDataSentAt))
+            : null,
+        },
+      };
+    }
+  }
+
+  // Get recent events
+  let fishEvents: Awaited<ReturnType<typeof getSessionEvents>>['events'] = [];
+  let plantEvents: Awaited<ReturnType<typeof getSessionEvents>>['events'] = [];
+
+  if (config.fishSessionId) {
+    const { events } = await getSessionEvents(config.fishSessionId, { limit: 10 });
+    fishEvents = events;
+  }
+
+  if (config.plantSessionId) {
+    const { events } = await getSessionEvents(config.plantSessionId, { limit: 10 });
+    plantEvents = events;
+  }
+
+  // Get recent cron runs
+  const recentCronRuns = await getRecentCronRuns(10);
 
   return {
-    fishDevice: fishDevice
-      ? { apiKey: fishDevice.apiKey, deviceMac: fishDevice.deviceMac }
-      : undefined,
-    plantDevice: plantDevice
-      ? { apiKey: plantDevice.apiKey, deviceMac: plantDevice.deviceMac }
-      : undefined,
-    fishDeviceName: fishDevice?.deviceName,
-    plantDeviceName: plantDevice?.deviceName,
-    isVirtualEnabled,
-    wouldConflict,
+    isConfigured: true,
+    isEnabled: config.enabled,
+    fishDevice,
+    plantDevice,
+    fishSession,
+    plantSession,
+    fishDataset: getDatasetSummary('fish'),
+    plantDataset: getDatasetSummary('plant'),
+    fishEvents,
+    plantEvents,
+    recentCronRuns,
   };
+}
+
+function getTimeAgo(date: Date): string {
+  const now = Date.now();
+  const diff = now - date.getTime();
+
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return 'just now';
 }
 
 export default async function SimulatorPage() {
@@ -57,161 +159,150 @@ export default async function SimulatorPage() {
     return null;
   }
 
-  const { fishDevice, plantDevice, fishDeviceName, plantDeviceName, isVirtualEnabled, wouldConflict } =
-    await getDevicesForSimulator(session.userId);
+  const data = await getSimulatorData(session.userId);
 
   return (
     <div className="space-y-6">
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Virtual ESP32 Simulator</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Virtual ESP32 Streaming</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Stream training data to test real-time dashboard updates
+            Control server-side data streaming with 1:1 real-time dataset timing
           </p>
         </div>
       </div>
 
-      {/* Warning Banner - Virtual Devices Already Enabled */}
-      {isVirtualEnabled && (
-        <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300">
-          <CardContent className="py-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-amber-800">
-                  Virtual Devices Already Active in Settings
-                </p>
-                <p className="text-sm text-amber-700">
-                  You have virtual ESP32 devices enabled in Settings with automatic cron-based streaming.
-                  {wouldConflict && (
-                    <span className="font-medium"> Running this simulator may cause duplicate or conflicting data.</span>
-                  )}
-                </p>
-                <div className="flex gap-3 mt-2">
-                  <Link
-                    href="/dashboard/settings"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-md transition-colors"
-                  >
-                    Go to Settings
-                    <ExternalLink className="h-3 w-3" />
-                  </Link>
-                  <span className="text-xs text-amber-600 self-center">
-                    Disable virtual devices there to use this simulator instead
-                  </span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Info Banner */}
-      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+      <Card className="bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
         <CardContent className="py-4">
           <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <Info className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
             <div className="space-y-2">
               <p className="text-sm text-gray-700">
-                This simulator acts as a virtual ESP32, sending sensor readings from CSV training
-                data to your telemetry API. Data will appear in real-time on your dashboards.
+                This control panel manages <strong>server-side streaming</strong> that persists even when your browser is closed.
+                Data is streamed according to the actual timestamps in the CSV dataset (1:1 real-time).
               </p>
-              <p className="text-xs text-gray-500">
-                <strong>Note:</strong> This browser-based simulator only runs while this page is open.
-                For persistent streaming, use the Virtual ESP32 settings in the Settings page.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <a
+              <div className="flex flex-wrap gap-4 text-xs text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Database className="h-3.5 w-3.5" />
+                  <span>{data.fishDataset.totalRows} fish readings</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Database className="h-3.5 w-3.5" />
+                  <span>{data.plantDataset.totalRows} plant readings</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>~{data.fishDataset.durationDays} days total duration</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Link
                   href="/dashboard/fish"
                   className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
                 >
                   <Fish className="h-4 w-4" />
                   View Fish Dashboard
                   <ExternalLink className="h-3 w-3" />
-                </a>
-                <a
+                </Link>
+                <Link
                   href="/dashboard/plants"
                   className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700"
                 >
                   <Leaf className="h-4 w-4" />
                   View Plant Dashboard
                   <ExternalLink className="h-3 w-3" />
-                </a>
+                </Link>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Device Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className={fishDevice ? 'border-blue-200' : 'border-gray-200 opacity-60'}>
+      {/* Streaming Control Panel */}
+      <StreamingControlPanel
+        fishSession={data.fishSession as any}
+        plantSession={data.plantSession as any}
+        fishDevice={data.fishDevice}
+        plantDevice={data.plantDevice}
+        fishDataset={data.fishDataset}
+        plantDataset={data.plantDataset}
+        isConfigured={data.isConfigured}
+        isEnabled={data.isEnabled}
+      />
+
+      {/* Streaming Logs */}
+      <StreamingLogsViewer
+        fishSessionId={data.fishSession?.id}
+        plantSessionId={data.plantSession?.id}
+        initialFishEvents={data.fishEvents as any[]}
+        initialPlantEvents={data.plantEvents as any[]}
+        recentCronRuns={data.recentCronRuns as any[]}
+      />
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Fish className="h-5 w-5 text-blue-500" />
-              Fish Device
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Cpu className="h-4 w-4 text-purple-500" />
+              Configure Virtual Devices
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {fishDevice ? (
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-900">{fishDeviceName}</p>
-                <p className="text-xs text-gray-500 font-mono">{fishDevice.deviceMac}</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <span className="h-2 w-2 bg-green-500 rounded-full" />
-                  <span className="text-xs text-green-600">Ready for simulation</span>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-gray-500">No fish device registered</p>
-                <a
-                  href="/dashboard/devices"
-                  className="inline-flex items-center text-xs text-blue-600 hover:underline"
-                >
-                  Register a device
-                  <ExternalLink className="h-3 w-3 ml-1" />
-                </a>
-              </div>
-            )}
+            <p className="text-xs text-gray-500 mb-3">
+              Enable or disable virtual devices and configure streaming settings.
+            </p>
+            <Link
+              href="/dashboard/settings"
+              className="inline-flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700"
+            >
+              Go to Settings
+              <ExternalLink className="h-3 w-3" />
+            </Link>
           </CardContent>
         </Card>
 
-        <Card className={plantDevice ? 'border-green-200' : 'border-gray-200 opacity-60'}>
+        <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Leaf className="h-5 w-5 text-green-500" />
-              Plant Device
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Activity className="h-4 w-4 text-blue-500" />
+              View All Devices
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {plantDevice ? (
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-900">{plantDeviceName}</p>
-                <p className="text-xs text-gray-500 font-mono">{plantDevice.deviceMac}</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <span className="h-2 w-2 bg-green-500 rounded-full" />
-                  <span className="text-xs text-green-600">Ready for simulation</span>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-gray-500">No plant device registered</p>
-                <a
-                  href="/dashboard/devices"
-                  className="inline-flex items-center text-xs text-green-600 hover:underline"
-                >
-                  Register a device
-                  <ExternalLink className="h-3 w-3 ml-1" />
-                </a>
-              </div>
-            )}
+            <p className="text-xs text-gray-500 mb-3">
+              See all registered devices including virtual ESP32 devices.
+            </p>
+            <Link
+              href="/dashboard/devices"
+              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+            >
+              View Devices
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Database className="h-4 w-4 text-green-500" />
+              Training Data
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-gray-500 mb-3">
+              CSV datasets with real aquaponics sensor readings.
+            </p>
+            <div className="text-xs text-gray-600">
+              <p>Fish: {data.fishDataset.firstTimestamp.split('T')[0]} to {data.fishDataset.lastTimestamp.split('T')[0]}</p>
+              <p>Plant: {data.plantDataset.firstTimestamp.split('T')[0]} to {data.plantDataset.lastTimestamp.split('T')[0]}</p>
+            </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Virtual ESP32 Component */}
-      <VirtualESP32 fishDevice={fishDevice} plantDevice={plantDevice} />
     </div>
   );
 }

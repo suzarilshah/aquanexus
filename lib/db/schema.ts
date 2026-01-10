@@ -153,6 +153,93 @@ export const mlModels = pgTable('ml_models', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Enum for streaming session status
+export const sessionStatusEnum = pgEnum('session_status', ['active', 'paused', 'completed', 'failed']);
+
+// Device streaming sessions table - track streaming sessions
+export const deviceStreamingSessions = pgTable('device_streaming_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  configId: uuid('config_id').notNull(), // Will reference virtualDeviceConfig
+  deviceType: varchar('device_type', { length: 10 }).notNull(), // 'fish' | 'plant'
+
+  // Session status
+  status: sessionStatusEnum('status').default('active').notNull(),
+
+  // Progress tracking
+  totalRows: integer('total_rows').notNull(),
+  lastRowSent: integer('last_row_sent').default(0).notNull(),
+  rowsStreamed: integer('rows_streamed').default(0).notNull(),
+
+  // Timing
+  sessionStartedAt: timestamp('session_started_at').notNull(),
+  sessionPausedAt: timestamp('session_paused_at'),
+  totalPausedMs: integer('total_paused_ms').default(0).notNull(),
+  sessionCompletedAt: timestamp('session_completed_at'),
+  lastDataSentAt: timestamp('last_data_sent_at'),
+  expectedCompletionAt: timestamp('expected_completion_at'),
+
+  // Error tracking
+  errorCount: integer('error_count').default(0).notNull(),
+  consecutiveErrors: integer('consecutive_errors').default(0).notNull(),
+  lastErrorAt: timestamp('last_error_at'),
+  lastErrorMessage: text('last_error_message'),
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Streaming event logs table - comprehensive event logging
+export const streamingEventLogs = pgTable('streaming_event_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sessionId: uuid('session_id').references(() => deviceStreamingSessions.id).notNull(),
+
+  eventType: varchar('event_type', { length: 50 }).notNull(),
+  // Event types:
+  // - session_started, session_paused, session_resumed, session_completed, session_failed
+  // - data_sent (each reading), data_batch_sent (group of readings)
+  // - dataset_reset, dataset_loop_started
+  // - error_occurred, error_recovered
+  // - cron_triggered
+
+  // Event details
+  eventDetails: jsonb('event_details'), // Flexible JSON for event-specific data
+  dataRowIndex: integer('data_row_index'), // Which CSV row
+  csvTimestamp: varchar('csv_timestamp', { length: 50 }), // Original timestamp from CSV
+  sensorValues: jsonb('sensor_values'), // The actual sensor data sent
+
+  // Grouping
+  cronRunId: varchar('cron_run_id', { length: 50 }), // Group events by cron execution
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Cron execution logs table - track each cron run
+export const cronExecutionLogs = pgTable('cron_execution_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: varchar('run_id', { length: 50 }).unique().notNull(),
+
+  status: varchar('status', { length: 20 }).notNull(), // started, completed, failed
+  triggerSource: varchar('trigger_source', { length: 50 }), // cron-job.org, manual, vercel-cron
+
+  // Metrics
+  configsProcessed: integer('configs_processed').default(0),
+  sessionsProcessed: integer('sessions_processed').default(0),
+  readingsSent: integer('readings_sent').default(0),
+  errorsEncountered: integer('errors_encountered').default(0),
+
+  // Details
+  processedConfigs: jsonb('processed_configs'), // Array of config IDs processed
+  processedSessions: jsonb('processed_sessions'), // Array of session IDs processed
+  errorDetails: jsonb('error_details'), // Array of error objects
+
+  // Timing
+  startedAt: timestamp('started_at').notNull(),
+  completedAt: timestamp('completed_at'),
+  durationMs: integer('duration_ms'),
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Virtual device configuration table - for server-side streaming
 export const virtualDeviceConfig = pgTable('virtual_device_config', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -165,6 +252,20 @@ export const virtualDeviceConfig = pgTable('virtual_device_config', {
   currentFishIndex: integer('current_fish_index').default(0),
   currentPlantIndex: integer('current_plant_index').default(0),
   lastStreamedAt: timestamp('last_streamed_at'),
+
+  // Session management
+  fishSessionId: uuid('fish_session_id').references(() => deviceStreamingSessions.id),
+  plantSessionId: uuid('plant_session_id').references(() => deviceStreamingSessions.id),
+
+  // User preferences
+  dataRetentionOnReset: varchar('data_retention_on_reset', { length: 20 }).default('ask'), // retain, delete, ask
+  notifyOnCompletion: boolean('notify_on_completion').default(true),
+  notifyOnError: boolean('notify_on_error').default(true),
+
+  // Action tracking
+  lastUserAction: varchar('last_user_action', { length: 50 }),
+  lastUserActionAt: timestamp('last_user_action_at'),
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -222,3 +323,9 @@ export type HourlyAggregate = typeof hourlyAggregates.$inferSelect;
 export type NewHourlyAggregate = typeof hourlyAggregates.$inferInsert;
 export type VirtualDeviceConfig = typeof virtualDeviceConfig.$inferSelect;
 export type NewVirtualDeviceConfig = typeof virtualDeviceConfig.$inferInsert;
+export type DeviceStreamingSession = typeof deviceStreamingSessions.$inferSelect;
+export type NewDeviceStreamingSession = typeof deviceStreamingSessions.$inferInsert;
+export type StreamingEventLog = typeof streamingEventLogs.$inferSelect;
+export type NewStreamingEventLog = typeof streamingEventLogs.$inferInsert;
+export type CronExecutionLog = typeof cronExecutionLogs.$inferSelect;
+export type NewCronExecutionLog = typeof cronExecutionLogs.$inferInsert;
