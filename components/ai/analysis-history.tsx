@@ -140,7 +140,7 @@ export function AIAnalysisHistory({ analyses, devices }: AIAnalysisHistoryProps)
                 )}
               </td>
               <td className="py-3 px-4">
-                <span className="text-sm text-gray-500">{formatDate(analysis.createdAt)}</span>
+                <span className="text-sm text-gray-500" suppressHydrationWarning>{formatDate(analysis.createdAt)}</span>
               </td>
             </tr>
           ))}

@@ -151,7 +151,7 @@ export function DeviceList({ devices }: DeviceListProps) {
           <div className="mt-4 pt-4 border-t border-gray-100">
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-500">Last seen</span>
-              <span className="font-medium text-gray-700">{formatLastSeen(device.lastSeen)}</span>
+              <span className="font-medium text-gray-700" suppressHydrationWarning>{formatLastSeen(device.lastSeen)}</span>
             </div>
           </div>
 

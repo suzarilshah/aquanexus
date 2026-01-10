@@ -86,13 +86,43 @@ export async function callAIModel(
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
-    if (!content) {
-      throw new Error('No response from AI model');
+    if (!content || content.trim() === '') {
+      throw new Error('AI model returned empty response. Please try again.');
     }
 
-    // Parse the JSON response
-    const result = JSON.parse(content);
-    return result as AIAnalysisResult;
+    // Clean the response - remove markdown code blocks if present
+    let cleanedContent = content.trim();
+
+    // Remove ```json ... ``` or ``` ... ``` wrappers
+    if (cleanedContent.startsWith('```')) {
+      cleanedContent = cleanedContent.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+    }
+
+    // Try to extract JSON from the response if it contains other text
+    const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleanedContent = jsonMatch[0];
+    }
+
+    try {
+      const result = JSON.parse(cleanedContent);
+
+      // Validate required fields and provide defaults
+      return {
+        verdict: result.verdict || 'Analysis completed',
+        confidence: typeof result.confidence === 'number' ? result.confidence : 0.7,
+        reasoning: result.reasoning || 'No detailed reasoning provided',
+        recommendations: Array.isArray(result.recommendations) ? result.recommendations : [],
+        metrics: {
+          healthScore: result.metrics?.healthScore ?? 70,
+          riskLevel: result.metrics?.riskLevel || 'medium',
+          trends: Array.isArray(result.metrics?.trends) ? result.metrics.trends : [],
+        },
+      };
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', cleanedContent);
+      throw new Error(`AI returned invalid JSON response. Raw content: ${cleanedContent.substring(0, 200)}...`);
+    }
   } catch (error) {
     console.error('AI model call failed:', error);
     throw error;

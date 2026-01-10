@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { devices, fishReadings, plantReadings, alerts } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { devices, fishReadings, plantReadings, plantGrowth, alerts } from '@/lib/db/schema';
+import { eq, desc, and } from 'drizzle-orm';
 import { sensorUpdateEmitter } from '@/lib/realtime';
 
 interface SensorReading {
@@ -206,8 +206,15 @@ export async function POST(request: Request) {
           case 'humidity':
             plantData.humidity = reading.value;
             break;
+          case 'height':
+          case 'plant_height':
+          case 'plantHeight':
+            plantData.height = reading.value;
+            break;
         }
       });
+
+      const currentTimestamp = new Date();
 
       // Insert plant reading
       await db.insert(plantReadings).values({
@@ -216,11 +223,77 @@ export async function POST(request: Request) {
         lightLevel: plantData.lightLevel?.toString(),
         temperature: plantData.temperature?.toString(),
         humidity: plantData.humidity?.toString(),
-        timestamp: new Date(),
+        height: plantData.height?.toString(),
+        timestamp: currentTimestamp,
       });
+
+      // If height is present, calculate growth rate and store in plantGrowth table
+      if (plantData.height !== undefined) {
+        // Get the most recent height measurement to calculate growth rate
+        const previousGrowth = await db
+          .select()
+          .from(plantGrowth)
+          .where(eq(plantGrowth.deviceId, device[0].id))
+          .orderBy(desc(plantGrowth.measuredAt))
+          .limit(1);
+
+        let growthRate: number | null = null;
+        let daysFromPlanting: number | null = null;
+
+        if (previousGrowth.length > 0) {
+          const prevHeight = parseFloat(previousGrowth[0].height);
+          const prevTime = previousGrowth[0].measuredAt;
+          const timeDiffMs = currentTimestamp.getTime() - prevTime.getTime();
+          const timeDiffDays = timeDiffMs / (1000 * 60 * 60 * 24);
+
+          // Calculate growth rate in cm/day (only if time difference > 0)
+          if (timeDiffDays > 0) {
+            growthRate = (plantData.height - prevHeight) / timeDiffDays;
+          }
+
+          // Calculate days from planting (use first record's date as planting date)
+          const firstGrowth = await db
+            .select()
+            .from(plantGrowth)
+            .where(eq(plantGrowth.deviceId, device[0].id))
+            .orderBy(plantGrowth.measuredAt)
+            .limit(1);
+
+          if (firstGrowth.length > 0) {
+            const plantingDate = firstGrowth[0].measuredAt;
+            daysFromPlanting = Math.floor(
+              (currentTimestamp.getTime() - plantingDate.getTime()) / (1000 * 60 * 60 * 24)
+            );
+          }
+        }
+
+        // Insert into plantGrowth table
+        await db.insert(plantGrowth).values({
+          deviceId: device[0].id,
+          measuredAt: currentTimestamp,
+          height: plantData.height.toString(),
+          growthRate: growthRate?.toFixed(4),
+          daysFromPlanting,
+        });
+
+        // Emit SSE update for growth data
+        sensorUpdateEmitter.emit({
+          type: 'growth_update',
+          deviceId: device[0].id,
+          deviceMac,
+          data: {
+            height: plantData.height,
+            growthRate,
+            daysFromPlanting,
+          },
+          timestamp: currentTimestamp.toISOString(),
+        });
+      }
 
       // Check thresholds
       Object.entries(plantData).forEach(([key, value]) => {
+        // Skip height for threshold checking (no standard thresholds)
+        if (key === 'height') return;
         const alert = checkThreshold(value, key as keyof typeof THRESHOLDS.plant, 'plant');
         if (alert) {
           alertsToCreate.push({
@@ -239,7 +312,7 @@ export async function POST(request: Request) {
         deviceId: device[0].id,
         deviceMac,
         data: plantData,
-        timestamp: new Date().toISOString(),
+        timestamp: currentTimestamp.toISOString(),
       });
     }
 

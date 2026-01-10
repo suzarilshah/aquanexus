@@ -1,13 +1,14 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Droplets, Sun, Thermometer, CloudRain } from 'lucide-react';
+import { Droplets, Sun, Thermometer, CloudRain, Ruler } from 'lucide-react';
 
 interface PlantSensorCardsProps {
   soilMoisture: number | null;
   lightLevel: number | null;
   temperature: number | null;
   humidity: number | null;
+  height?: number | null;
 }
 
 const THRESHOLDS = {
@@ -15,6 +16,7 @@ const THRESHOLDS = {
   lightLevel: { min: 2000, max: 50000, unit: 'lux' },
   temperature: { min: 18, max: 28, unit: '°C' },
   humidity: { min: 40, max: 70, unit: '%' },
+  height: { min: 0, max: 200, unit: 'cm' }, // Height has no warning thresholds
 };
 
 function getStatus(value: number | null, threshold: { min: number; max: number }) {
@@ -50,8 +52,19 @@ export function PlantSensorCards({
   lightLevel,
   temperature,
   humidity,
+  height,
 }: PlantSensorCardsProps) {
   const sensors = [
+    {
+      name: 'Plant Height',
+      value: height ?? null,
+      icon: Ruler,
+      threshold: THRESHOLDS.height,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100',
+      isLux: false,
+      noStatusCheck: true, // Height doesn't need status warnings
+    },
     {
       name: 'Soil Moisture',
       value: soilMoisture,
@@ -60,6 +73,7 @@ export function PlantSensorCards({
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
       isLux: false,
+      noStatusCheck: false,
     },
     {
       name: 'Light Level',
@@ -69,6 +83,7 @@ export function PlantSensorCards({
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-100',
       isLux: true,
+      noStatusCheck: false,
     },
     {
       name: 'Temperature',
@@ -78,6 +93,7 @@ export function PlantSensorCards({
       color: 'text-orange-600',
       bgColor: 'bg-orange-100',
       isLux: false,
+      noStatusCheck: false,
     },
     {
       name: 'Humidity',
@@ -87,14 +103,17 @@ export function PlantSensorCards({
       color: 'text-cyan-600',
       bgColor: 'bg-cyan-100',
       isLux: false,
+      noStatusCheck: false,
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
       {sensors.map((sensor) => {
-        const status = getStatus(sensor.value, sensor.threshold);
-        const styles = getStatusStyles(status);
+        const status = sensor.noStatusCheck ? 'normal' : getStatus(sensor.value, sensor.threshold);
+        const styles = sensor.noStatusCheck && sensor.value !== null
+          ? { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' }
+          : getStatusStyles(status);
 
         return (
           <div
@@ -109,7 +128,7 @@ export function PlantSensorCards({
               <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', sensor.bgColor)}>
                 <sensor.icon className={cn('h-5 w-5', sensor.color)} />
               </div>
-              {status !== 'unknown' && (
+              {!sensor.noStatusCheck && status !== 'unknown' && (
                 <span
                   className={cn(
                     'h-2 w-2 rounded-full',
@@ -128,9 +147,11 @@ export function PlantSensorCards({
                   {sensor.threshold.unit}
                 </span>
               </p>
-              <div className="mt-2 text-xs text-gray-400">
-                Range: {sensor.isLux ? `${sensor.threshold.min/1000}k` : sensor.threshold.min} - {sensor.isLux ? `${sensor.threshold.max/1000}k` : sensor.threshold.max} {sensor.threshold.unit}
-              </div>
+              {!sensor.noStatusCheck && (
+                <div className="mt-2 text-xs text-gray-400">
+                  Range: {sensor.isLux ? `${sensor.threshold.min/1000}k` : sensor.threshold.min} - {sensor.isLux ? `${sensor.threshold.max/1000}k` : sensor.threshold.max} {sensor.threshold.unit}
+                </div>
+              )}
             </div>
           </div>
         );

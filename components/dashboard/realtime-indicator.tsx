@@ -12,6 +12,12 @@ interface RealTimeIndicatorProps {
 export function RealTimeIndicator({ totalDevices = 0, onlineDevices = 0 }: RealTimeIndicatorProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch by only rendering time after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     // Connect to SSE endpoint for real-time updates
@@ -111,10 +117,10 @@ export function RealTimeIndicator({ totalDevices = 0, onlineDevices = 0 }: RealT
       </div>
 
       {/* Last Update Time - only show if we have devices and are streaming */}
-      {lastUpdate && isConnected && onlineDevices > 0 && (
+      {mounted && lastUpdate && isConnected && onlineDevices > 0 && (
         <div className="flex items-center gap-1.5 text-xs text-gray-400">
           <RefreshCw className="h-3.5 w-3.5" />
-          <span className="tabular-nums">{lastUpdate.toLocaleTimeString()}</span>
+          <span className="tabular-nums" suppressHydrationWarning>{lastUpdate.toLocaleTimeString()}</span>
         </div>
       )}
     </div>

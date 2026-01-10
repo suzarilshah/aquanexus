@@ -114,11 +114,13 @@ export function ModelStatus({
       {lastUpdated && (
         <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-400">
           <Clock className="h-3 w-3" />
-          Last trained: {new Date(lastUpdated).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-          })}
+          <span suppressHydrationWarning>
+            Last trained: {new Date(lastUpdated).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
         </div>
       )}
 
