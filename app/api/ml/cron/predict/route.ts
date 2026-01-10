@@ -48,14 +48,21 @@ function calculateConfidence(data: number[], step: number, totalSteps: number): 
   return Math.max(0.5, Math.min(0.95, baseConfidence - stepPenalty));
 }
 
+// API Key for cron-job.org authentication (same key for all cron jobs)
+const CRON_API_KEY = '3KjxViJoTMHiXOnOA38QdIIErIFgUTpH7HqCzqMMxhk=';
+
 export async function GET(request: Request) {
   try {
-    // Verify this is a cron job request
+    // Verify this is a cron job request - support both header and query param
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      if (process.env.NODE_ENV === 'production') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    const queryKey = new URL(request.url).searchParams.get('key');
+    const isAuthorized =
+      authHeader === `Bearer ${process.env.CRON_SECRET}` ||
+      authHeader === `Bearer ${CRON_API_KEY}` ||
+      queryKey === CRON_API_KEY;
+
+    if (!isAuthorized && process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     console.log('[Cron Predict] Starting automatic predictions...');
