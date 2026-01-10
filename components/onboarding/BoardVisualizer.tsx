@@ -405,9 +405,9 @@ export function BoardVisualizer({
   };
 
   return (
-    <div className={cn('grid grid-cols-1 lg:grid-cols-3 gap-6', className)}>
+    <div className={cn('grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6', className)}>
       {/* Left: Interactive Pinout - inspired by pinouts.vercel.app */}
-      <div className="lg:col-span-2">
+      <div>
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-100">
@@ -722,28 +722,28 @@ export function BoardVisualizer({
             </span>
           </div>
 
-          {/* Pin Categories - Enhanced Grid */}
+          {/* Pin Categories - Compact Grid */}
           <div className="px-5 py-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pin Categories</span>
               <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{pinCategories.length} types</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
               {pinCategories.map((category) => (
                 <button
                   key={category.id}
                   onClick={() => setHighlightedCategory(highlightedCategory === category.id ? null : category.id)}
                   className={cn(
-                    'flex items-center justify-between px-3 py-2.5 rounded-xl border-2 transition-all text-left group',
+                    'flex items-center justify-between w-full px-3 py-2 rounded-xl border-2 transition-all text-left group',
                     highlightedCategory === category.id
                       ? `${category.bgColor} border-current ${category.color} shadow-sm`
                       : 'bg-white border-gray-100 hover:border-gray-200 hover:bg-gray-50'
                   )}
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     <div className={cn(
-                      'w-7 h-7 rounded-lg flex items-center justify-center transition-colors',
+                      'w-6 h-6 rounded-lg flex items-center justify-center transition-colors flex-shrink-0',
                       highlightedCategory === category.id
                         ? category.bgColor
                         : 'bg-gray-100 group-hover:bg-gray-200'
@@ -751,14 +751,14 @@ export function BoardVisualizer({
                       <span className={category.color}>{category.icon}</span>
                     </div>
                     <span className={cn(
-                      'text-sm font-medium',
+                      'text-sm font-medium truncate',
                       highlightedCategory === category.id ? category.color : 'text-gray-700'
                     )}>
                       {category.name}
                     </span>
                   </div>
                   <span className={cn(
-                    'text-sm font-bold',
+                    'text-sm font-bold ml-2 flex-shrink-0',
                     highlightedCategory === category.id ? category.color : 'text-gray-400'
                   )}>
                     {category.count}
@@ -842,25 +842,25 @@ export function BoardVisualizer({
               </h3>
             </div>
             <div className="px-5 py-4 space-y-4">
-              <p className="text-sm text-gray-600 leading-relaxed">{board.description}</p>
+              <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">{board.description}</p>
 
-              {/* Specs Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-3 border border-blue-100">
-                  <div className="text-[10px] text-blue-600 uppercase tracking-wider font-semibold">Clock Speed</div>
-                  <div className="text-lg font-bold text-blue-900 mt-1">{board.clockSpeed}</div>
+              {/* Specs Grid - Compact */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-2.5 border border-blue-100">
+                  <div className="text-[9px] text-blue-600 uppercase tracking-wider font-semibold">Clock</div>
+                  <div className="text-sm font-bold text-blue-900 mt-0.5 truncate">{board.clockSpeed}</div>
                 </div>
-                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-3 border border-amber-100">
-                  <div className="text-[10px] text-amber-600 uppercase tracking-wider font-semibold">Voltage</div>
-                  <div className="text-lg font-bold text-amber-900 mt-1">{board.voltage}</div>
+                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-lg p-2.5 border border-amber-100">
+                  <div className="text-[9px] text-amber-600 uppercase tracking-wider font-semibold">Voltage</div>
+                  <div className="text-sm font-bold text-amber-900 mt-0.5 truncate">{board.voltage}</div>
                 </div>
-                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-3 border border-emerald-100">
-                  <div className="text-[10px] text-emerald-600 uppercase tracking-wider font-semibold">Flash</div>
-                  <div className="text-lg font-bold text-emerald-900 mt-1">{board.flashSize}</div>
+                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-2.5 border border-emerald-100">
+                  <div className="text-[9px] text-emerald-600 uppercase tracking-wider font-semibold">Flash</div>
+                  <div className="text-sm font-bold text-emerald-900 mt-0.5 truncate">{board.flashSize}</div>
                 </div>
-                <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-3 border border-purple-100">
-                  <div className="text-[10px] text-purple-600 uppercase tracking-wider font-semibold">RAM</div>
-                  <div className="text-lg font-bold text-purple-900 mt-1">{board.ram}</div>
+                <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-2.5 border border-purple-100">
+                  <div className="text-[9px] text-purple-600 uppercase tracking-wider font-semibold">RAM</div>
+                  <div className="text-sm font-bold text-purple-900 mt-0.5 truncate">{board.ram}</div>
                 </div>
               </div>
             </div>

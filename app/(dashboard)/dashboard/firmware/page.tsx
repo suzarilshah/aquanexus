@@ -354,6 +354,7 @@ export default function FirmwareConfiguratorPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [loadingDevices, setLoadingDevices] = useState(true);
+  const [deviceError, setDeviceError] = useState<string | null>(null);
 
   // Fetch devices on mount
   useEffect(() => {
@@ -361,13 +362,32 @@ export default function FirmwareConfiguratorPage() {
 
     async function fetchDevices() {
       try {
-        const res = await fetch('/api/devices');
-        if (res.ok) {
-          const data = await res.json();
-          setDevices(data.devices || []);
+        setDeviceError(null);
+        const res = await fetch('/api/devices', {
+          credentials: 'include', // Ensure cookies are sent
+        });
+
+        if (res.status === 401) {
+          setDeviceError('Please log in to view your devices');
+          return;
+        }
+
+        if (!res.ok) {
+          setDeviceError(`Failed to load devices (${res.status})`);
+          return;
+        }
+
+        const data = await res.json();
+        const deviceList = data.devices || [];
+        setDevices(deviceList);
+
+        // Auto-select first device if available
+        if (deviceList.length > 0 && !selectedDeviceId) {
+          setSelectedDeviceId(deviceList[0].id);
         }
       } catch (error) {
         console.error('Failed to fetch devices:', error);
+        setDeviceError('Network error - please check your connection');
       } finally {
         setLoadingDevices(false);
       }
@@ -664,6 +684,18 @@ export default function FirmwareConfiguratorPage() {
                             <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
                               <Loader2 className="h-4 w-4 animate-spin text-cyan-500" />
                               <span className="text-sm text-gray-500">Loading devices...</span>
+                            </div>
+                          ) : deviceError ? (
+                            <div className="p-4 bg-red-50 rounded-xl border border-red-200">
+                              <div className="flex items-start gap-3">
+                                <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-sm font-medium text-red-800">{deviceError}</p>
+                                  <p className="text-xs text-red-600 mt-1">
+                                    Make sure you are logged in and have registered devices.
+                                  </p>
+                                </div>
+                              </div>
                             </div>
                           ) : devices.length === 0 ? (
                             <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
