@@ -22,6 +22,11 @@ import {
   recordSessionError,
   completeSession,
 } from '@/lib/virtual-device/session-service';
+import {
+  performSync,
+  updateHealthMetricsOnCronRun,
+  checkAndCreateAlerts,
+} from '@/lib/virtual-device/sync-service';
 
 // API Key for cron-job.org authentication
 const CRON_API_KEY = process.env.CRON_API_KEY || '3KjxViJoTMHiXOnOA38QdIIErIFgUTpH7HqCzqMMxhk=';
@@ -74,15 +79,47 @@ async function handleCronRequest(request: Request, method: string) {
       });
     }
 
+    // Track sync and health results for each user
+    const userSyncResults: Record<string, { synced: boolean; issues: string[] }> = {};
+
     // Process each config
     for (const config of configs) {
       try {
         cronContext.configsProcessed.push(config.id);
+
+        // Perform sync before processing to ensure sessions are up to date
+        if (!userSyncResults[config.userId]) {
+          const syncResult = await performSync(config.userId, cronContext.runId);
+          userSyncResults[config.userId] = {
+            synced: syncResult.success,
+            issues: syncResult.issues,
+          };
+
+          if (syncResult.issues.length > 0) {
+            console.log(`[Virtual Device Cron] Sync issues for user ${config.userId}:`, syncResult.issues);
+          }
+        }
+
         await processConfig(config, cronContext);
+
+        // Update health metrics on successful processing
+        await updateHealthMetricsOnCronRun(config.userId, true);
       } catch (configError) {
         const errorMessage = configError instanceof Error ? configError.message : 'Unknown error';
         console.error(`[Virtual Device Cron] Error processing config ${config.id}:`, errorMessage);
         addCronError(cronContext, errorMessage, config.id);
+
+        // Update health metrics on failure
+        await updateHealthMetricsOnCronRun(config.userId, false, errorMessage);
+      }
+    }
+
+    // Check and create alerts for each user processed
+    for (const userId of Object.keys(userSyncResults)) {
+      try {
+        await checkAndCreateAlerts(userId);
+      } catch (alertError) {
+        console.error(`[Virtual Device Cron] Error checking alerts for user ${userId}:`, alertError);
       }
     }
 
@@ -99,6 +136,7 @@ async function handleCronRequest(request: Request, method: string) {
       sessionsProcessed: cronContext.sessionsProcessed.length,
       readingsSent: cronContext.readingsSent,
       errors: cronContext.errors.length,
+      syncResults: userSyncResults,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

@@ -296,6 +296,40 @@ export const hourlyAggregates = pgTable('hourly_aggregates', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Cron health metrics table - track cron job health and synchronization status
+export const cronHealthMetrics = pgTable('cron_health_metrics', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+
+  // Last successful cron execution
+  lastCronSuccessAt: timestamp('last_cron_success_at'),
+  lastCronAttemptAt: timestamp('last_cron_attempt_at'),
+  lastCronError: text('last_cron_error'),
+
+  // Health status
+  cronStatus: varchar('cron_status', { length: 20 }).default('unknown').notNull(), // healthy, degraded, failed, unknown
+  consecutiveFailures: integer('consecutive_failures').default(0).notNull(),
+  totalSuccessCount: integer('total_success_count').default(0).notNull(),
+  totalFailureCount: integer('total_failure_count').default(0).notNull(),
+
+  // Sync status
+  syncStatus: varchar('sync_status', { length: 20 }).default('unknown').notNull(), // synced, out_of_sync, syncing, unknown
+  lastSyncAt: timestamp('last_sync_at'),
+  lastSyncError: text('last_sync_error'),
+
+  // Device status snapshot
+  activeDevicesCount: integer('active_devices_count').default(0).notNull(),
+  activeSessionsCount: integer('active_sessions_count').default(0).notNull(),
+  orphanedSessionsCount: integer('orphaned_sessions_count').default(0).notNull(),
+
+  // Alert settings
+  alertOnFailure: boolean('alert_on_failure').default(true).notNull(),
+  alertThresholdMinutes: integer('alert_threshold_minutes').default(360).notNull(), // 6 hours default (slightly more than 5-hour interval)
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -329,3 +363,5 @@ export type StreamingEventLog = typeof streamingEventLogs.$inferSelect;
 export type NewStreamingEventLog = typeof streamingEventLogs.$inferInsert;
 export type CronExecutionLog = typeof cronExecutionLogs.$inferSelect;
 export type NewCronExecutionLog = typeof cronExecutionLogs.$inferInsert;
+export type CronHealthMetrics = typeof cronHealthMetrics.$inferSelect;
+export type NewCronHealthMetrics = typeof cronHealthMetrics.$inferInsert;

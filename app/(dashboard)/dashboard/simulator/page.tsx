@@ -1,15 +1,17 @@
 import { getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { devices, virtualDeviceConfig, deviceStreamingSessions } from '@/lib/db/schema';
+import { devices, virtualDeviceConfig, deviceStreamingSessions, cronHealthMetrics } from '@/lib/db/schema';
 import { eq, and, or, desc } from 'drizzle-orm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StreamingControlPanel } from '@/components/simulator/streaming-control-panel';
 import { StreamingLogsViewer } from '@/components/simulator/streaming-logs-viewer';
+import { HealthStatusCard } from '@/components/simulator/health-status-card';
 import { Cpu, Info, Fish, Leaf, ExternalLink, Database, Clock, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { getDatasetSummary } from '@/lib/virtual-device/csv-parser';
 import { getSessionEvents, getRecentCronRuns } from '@/lib/virtual-device/logging-service';
 import { calculateProgress, formatDuration } from '@/lib/virtual-device/timing-calculator';
+import { getHealthCheck } from '@/lib/virtual-device/sync-service';
 
 async function getSimulatorData(userId: string) {
   // Get user's virtual device config
@@ -32,6 +34,7 @@ async function getSimulatorData(userId: string) {
       fishEvents: [],
       plantEvents: [],
       recentCronRuns: [],
+      health: null,
     };
   }
 
@@ -122,6 +125,9 @@ async function getSimulatorData(userId: string) {
   // Get recent cron runs
   const recentCronRuns = await getRecentCronRuns(10);
 
+  // Get health status
+  const health = await getHealthCheck(userId);
+
   return {
     isConfigured: true,
     isEnabled: config.enabled,
@@ -134,6 +140,7 @@ async function getSimulatorData(userId: string) {
     fishEvents,
     plantEvents,
     recentCronRuns,
+    health,
   };
 }
 
@@ -219,6 +226,11 @@ export default async function SimulatorPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Health Status and Sync Controls */}
+      {data.isConfigured && (
+        <HealthStatusCard health={data.health} />
+      )}
 
       {/* Streaming Control Panel */}
       <StreamingControlPanel

@@ -25,7 +25,9 @@ export type StreamingEventType =
   | 'dataset_loop_started'
   | 'error_occurred'
   | 'error_recovered'
-  | 'cron_triggered';
+  | 'cron_triggered'
+  | 'manual_sync_triggered'
+  | 'sync_completed';
 
 // Event details interfaces
 export interface DataSentDetails {
