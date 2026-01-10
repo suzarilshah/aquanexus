@@ -148,8 +148,13 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('[Virtual Device Cron] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        details: errorMessage,
+        hint: 'If table does not exist, run: npm run db:push'
+      },
       { status: 500 }
     );
   }
