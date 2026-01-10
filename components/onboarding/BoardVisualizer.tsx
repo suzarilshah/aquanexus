@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import type { BoardDefinition, PinDefinition, PinCapability } from '@/data/boards';
 import type { SensorDefinition } from '@/data/sensors';
-import { SENSOR_CATEGORIES, getSensorsByCategory, type SensorCategory } from '@/data/sensors';
+import { SENSOR_CATEGORIES, getSensorsByCategory, getAquaponicsSensors, type SensorCategory } from '@/data/sensors';
 import * as Popover from '@radix-ui/react-popover';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
@@ -82,6 +82,7 @@ interface BoardVisualizerProps {
   onAssign: (assignment: PinAssignment) => void;
   onUnassign: (pinId: string) => void;
   className?: string;
+  deviceType?: 'fish' | 'plant' | 'general';
 }
 
 export function BoardVisualizer({
@@ -90,6 +91,7 @@ export function BoardVisualizer({
   onAssign,
   onUnassign,
   className,
+  deviceType = 'general',
 }: BoardVisualizerProps) {
   const [selectedPin, setSelectedPin] = useState<PinDefinition | null>(null);
   const [hoveredPin, setHoveredPin] = useState<string | null>(null);
@@ -393,6 +395,7 @@ export function BoardVisualizer({
               onSelectSensor={handleSensorSelect}
               onUnassign={() => handleUnassign(pin.id)}
               canAssignSensor={canAssignSensor}
+              deviceType={deviceType}
             />
             <Popover.Arrow className="fill-white" />
           </Popover.Content>
@@ -678,26 +681,52 @@ export function BoardVisualizer({
         </div>
       </div>
 
-      {/* Right: Board Info Panel - inspired by pinouts.vercel.app */}
+      {/* Right: Board Info Panel - Premium Design */}
       <div className="space-y-4">
-        {/* Board Header Card */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="text-xl font-bold text-gray-900">{board.name}</h2>
-            <button
-              onClick={() => setShowBoardInfo(!showBoardInfo)}
-              className="mt-2 text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 transition-colors"
-            >
-              Click to view board information
-              {showBoardInfo ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
+        {/* Board Header Card - Premium Style */}
+        <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+          {/* Board Identity Header */}
+          <div className="px-5 py-5 border-b border-gray-100">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 flex-shrink-0">
+                <Cpu className="w-7 h-7 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-gray-900 tracking-tight">{board.name}</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{board.microcontroller}</p>
+                <button
+                  onClick={() => setShowBoardInfo(!showBoardInfo)}
+                  className="mt-2 text-xs font-medium text-cyan-600 hover:text-cyan-700 flex items-center gap-1 transition-colors"
+                >
+                  {showBoardInfo ? 'Hide specifications' : 'View specifications'}
+                  {showBoardInfo ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Pin Categories */}
+          {/* Quick Stats Row */}
+          <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1 text-gray-500">
+                <Zap className="w-3 h-3 text-amber-500" />
+                {board.clockSpeed}
+              </span>
+              <span className="flex items-center gap-1 text-gray-500">
+                <Activity className="w-3 h-3 text-emerald-500" />
+                {board.voltage}
+              </span>
+            </div>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+              Ready
+            </span>
+          </div>
+
+          {/* Pin Categories - Enhanced Grid */}
           <div className="px-5 py-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pin Categories</span>
-              <span className="text-xs text-gray-400">{pinCategories.length}</span>
+              <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{pinCategories.length} types</span>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -706,14 +735,21 @@ export function BoardVisualizer({
                   key={category.id}
                   onClick={() => setHighlightedCategory(highlightedCategory === category.id ? null : category.id)}
                   className={cn(
-                    'flex items-center justify-between px-3 py-2.5 rounded-lg border transition-all text-left',
+                    'flex items-center justify-between px-3 py-2.5 rounded-xl border-2 transition-all text-left group',
                     highlightedCategory === category.id
-                      ? `${category.bgColor} border-current ${category.color}`
-                      : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      ? `${category.bgColor} border-current ${category.color} shadow-sm`
+                      : 'bg-white border-gray-100 hover:border-gray-200 hover:bg-gray-50'
                   )}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className={category.color}>{category.icon}</span>
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn(
+                      'w-7 h-7 rounded-lg flex items-center justify-center transition-colors',
+                      highlightedCategory === category.id
+                        ? category.bgColor
+                        : 'bg-gray-100 group-hover:bg-gray-200'
+                    )}>
+                      <span className={category.color}>{category.icon}</span>
+                    </div>
                     <span className={cn(
                       'text-sm font-medium',
                       highlightedCategory === category.id ? category.color : 'text-gray-700'
@@ -722,8 +758,8 @@ export function BoardVisualizer({
                     </span>
                   </div>
                   <span className={cn(
-                    'text-sm font-semibold',
-                    highlightedCategory === category.id ? category.color : 'text-gray-500'
+                    'text-sm font-bold',
+                    highlightedCategory === category.id ? category.color : 'text-gray-400'
                   )}>
                     {category.count}
                   </span>
@@ -733,34 +769,45 @@ export function BoardVisualizer({
           </div>
         </div>
 
-        {/* Selected Pin Details Card */}
+        {/* Selected Pin Details Card - Enhanced */}
         {selectedPin && (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900">Pin Details</h3>
+          <div className="bg-gradient-to-br from-white to-cyan-50/30 rounded-2xl border border-cyan-200 overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-cyan-100 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-cyan-100 flex items-center justify-center">
+                  <Info className="w-3.5 h-3.5 text-cyan-600" />
+                </div>
+                Pin Details
+              </h3>
+              <span className={cn(
+                'text-xs font-semibold px-2.5 py-1 rounded-lg',
+                getPinTypeColor(selectedPin)
+              )}>
+                {getPinTypeLabel(selectedPin)}
+              </span>
             </div>
 
             <div className="px-5 py-4 space-y-4">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500">Pin</span>
-                <span className="font-mono text-sm font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">
-                  {selectedPin.gpio !== null ? selectedPin.gpio : selectedPin.name}
-                </span>
-                <span className="text-xs text-gray-500">Type</span>
-                <span className={cn(
-                  'text-xs font-medium px-2 py-0.5 rounded-full',
-                  getPinTypeColor(selectedPin)
-                )}>
-                  {getPinTypeLabel(selectedPin)}
-                </span>
+              <div className="flex items-center gap-4 bg-white/60 rounded-xl p-3 border border-gray-100">
+                <div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider">GPIO</div>
+                  <div className="font-mono text-lg font-bold text-gray-900">
+                    {selectedPin.gpio !== null ? selectedPin.gpio : 'N/A'}
+                  </div>
+                </div>
+                <div className="h-8 w-px bg-gray-200" />
+                <div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider">Name</div>
+                  <div className="font-mono text-lg font-bold text-gray-900">{selectedPin.name}</div>
+                </div>
               </div>
 
               {selectedPin.aliases.length > 0 && (
                 <div>
-                  <div className="text-xs font-medium text-gray-600 mb-2">Names</div>
-                  <div className="flex flex-wrap gap-1">
+                  <div className="text-xs font-medium text-gray-600 mb-2">Alternative Names</div>
+                  <div className="flex flex-wrap gap-1.5">
                     {selectedPin.aliases.map((alias) => (
-                      <span key={alias} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded font-mono">
+                      <span key={alias} className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-lg font-mono border border-gray-200">
                         {alias}
                       </span>
                     ))}
@@ -769,52 +816,51 @@ export function BoardVisualizer({
               )}
 
               {selectedPin.strapping && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-4 py-3">
                   <div className="flex items-center gap-2 text-amber-700">
-                    <AlertTriangle className="w-3 h-3" />
-                    <span className="text-xs font-medium">Strapping Pin</span>
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-sm font-semibold">Strapping Pin</span>
                   </div>
+                  <p className="text-xs text-amber-600 mt-1">
+                    This pin affects boot behavior. Use with caution.
+                  </p>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Board Information Card (collapsible) */}
+        {/* Board Specifications Card (collapsible) - Premium */}
         {showBoardInfo && (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900">Board Information</h3>
+          <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+                  <Cpu className="w-3.5 h-3.5 text-white" />
+                </div>
+                Specifications
+              </h3>
             </div>
             <div className="px-5 py-4 space-y-4">
-              <p className="text-sm text-gray-600">{board.description}</p>
+              <p className="text-sm text-gray-600 leading-relaxed">{board.description}</p>
 
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
-                  <Cpu className="w-5 h-5 text-gray-600" />
+              {/* Specs Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-3 border border-blue-100">
+                  <div className="text-[10px] text-blue-600 uppercase tracking-wider font-semibold">Clock Speed</div>
+                  <div className="text-lg font-bold text-blue-900 mt-1">{board.clockSpeed}</div>
                 </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-900">{board.microcontroller}</div>
-                  <div className="text-xs text-gray-500">Main processing unit</div>
+                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-3 border border-amber-100">
+                  <div className="text-[10px] text-amber-600 uppercase tracking-wider font-semibold">Voltage</div>
+                  <div className="text-lg font-bold text-amber-900 mt-1">{board.voltage}</div>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
-                <div>
-                  <div className="text-xs text-gray-500">Clock Speed</div>
-                  <div className="text-sm font-semibold text-gray-900">{board.clockSpeed}</div>
+                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-3 border border-emerald-100">
+                  <div className="text-[10px] text-emerald-600 uppercase tracking-wider font-semibold">Flash</div>
+                  <div className="text-lg font-bold text-emerald-900 mt-1">{board.flashSize}</div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Voltage</div>
-                  <div className="text-sm font-semibold text-gray-900">{board.voltage}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Flash</div>
-                  <div className="text-sm font-semibold text-gray-900">{board.flashSize}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">RAM</div>
-                  <div className="text-sm font-semibold text-gray-900">{board.ram}</div>
+                <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-3 border border-purple-100">
+                  <div className="text-[10px] text-purple-600 uppercase tracking-wider font-semibold">RAM</div>
+                  <div className="text-lg font-bold text-purple-900 mt-1">{board.ram}</div>
                 </div>
               </div>
             </div>
@@ -832,6 +878,7 @@ interface PinPopoverContentProps {
   onSelectSensor: (sensor: SensorDefinition, pinName: string) => void;
   onUnassign: () => void;
   canAssignSensor: (pin: PinDefinition, sensor: SensorDefinition, sensorPin: { capabilities: PinCapability[] }) => boolean;
+  deviceType: 'fish' | 'plant' | 'general';
 }
 
 function PinPopoverContent({
@@ -840,10 +887,14 @@ function PinPopoverContent({
   onSelectSensor,
   onUnassign,
   canAssignSensor,
+  deviceType,
 }: PinPopoverContentProps) {
   const [activeCategory, setActiveCategory] = useState<SensorCategory>('temperature');
 
   const isPowerOrGnd = pin.capabilities.includes('POWER') || pin.capabilities.includes('GND');
+
+  // Get aquaponics sensors for the device type
+  const aquaponicsSensors = useMemo(() => getAquaponicsSensors(deviceType), [deviceType]);
 
   if (isPowerOrGnd) {
     return (
@@ -896,8 +947,6 @@ function PinPopoverContent({
     );
   }
 
-  const categories = Object.keys(SENSOR_CATEGORIES) as SensorCategory[];
-
   return (
     <div>
       {/* Header */}
@@ -918,83 +967,66 @@ function PinPopoverContent({
         </div>
       </div>
 
-      {/* Sensor Selection */}
-      <Tabs.Root value={activeCategory} onValueChange={(v) => setActiveCategory(v as SensorCategory)}>
-        <Tabs.List className="flex border-b border-gray-100 px-2 overflow-x-auto">
-          {categories.slice(0, 5).map((cat) => {
-            const catInfo = SENSOR_CATEGORIES[cat];
-            const CatIcon = ICONS[catInfo.icon] || Info;
+      {/* Aquaponics Sensor Selection - Streamlined */}
+      <div className="p-3">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Leaf className="h-3 w-3" />
+          Aquaponics Sensors ({deviceType === 'fish' ? 'Fish Tank' : deviceType === 'plant' ? 'Grow Bed' : 'All'})
+        </div>
+        <div className="space-y-1 max-h-60 overflow-y-auto">
+          {aquaponicsSensors.map((sensor) => {
+            const SensorIcon = ICONS[sensor.icon] || Info;
+            const compatiblePins = sensor.pins.filter((sp) => canAssignSensor(pin, sensor, sp));
+            const isCompatible = compatiblePins.length > 0;
+
             return (
-              <Tabs.Trigger
-                key={cat}
-                value={cat}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap',
-                  activeCategory === cat
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                )}
-              >
-                <CatIcon className="h-3 w-3" />
-                {catInfo.name}
-              </Tabs.Trigger>
+              <div key={sensor.id}>
+                {compatiblePins.map((sensorPin) => (
+                  <button
+                    key={`${sensor.id}-${sensorPin.name}`}
+                    onClick={() => onSelectSensor(sensor, sensorPin.name)}
+                    disabled={!isCompatible}
+                    className={cn(
+                      'w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all',
+                      isCompatible
+                        ? 'hover:bg-gradient-to-r hover:from-cyan-50 hover:to-teal-50 cursor-pointer border border-transparent hover:border-cyan-200'
+                        : 'opacity-40 cursor-not-allowed'
+                    )}
+                  >
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: `${sensor.color}15` }}
+                    >
+                      <SensorIcon className="h-5 w-5" style={{ color: sensor.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 text-sm">
+                        {sensor.name}
+                        {sensor.pins.length > 1 && (
+                          <span className="text-gray-400 font-normal text-xs ml-1">({sensorPin.name})</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate mt-0.5">
+                        {sensor.description}
+                      </div>
+                    </div>
+                    {isCompatible && (
+                      <div className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+                        Ready
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
             );
           })}
-        </Tabs.List>
-
-        {categories.map((cat) => (
-          <Tabs.Content key={cat} value={cat} className="p-2 max-h-60 overflow-y-auto">
-            <div className="space-y-1">
-              {getSensorsByCategory(cat).map((sensor) => {
-                const SensorIcon = ICONS[sensor.icon] || Info;
-                const compatiblePins = sensor.pins.filter((sp) => canAssignSensor(pin, sensor, sp));
-                const isCompatible = compatiblePins.length > 0;
-
-                return (
-                  <div key={sensor.id}>
-                    {compatiblePins.map((sensorPin) => (
-                      <button
-                        key={`${sensor.id}-${sensorPin.name}`}
-                        onClick={() => onSelectSensor(sensor, sensorPin.name)}
-                        disabled={!isCompatible}
-                        className={cn(
-                          'w-full flex items-center gap-3 p-2 rounded-lg text-left transition-colors',
-                          isCompatible
-                            ? 'hover:bg-gray-50 cursor-pointer'
-                            : 'opacity-40 cursor-not-allowed'
-                        )}
-                      >
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: `${sensor.color}15` }}
-                        >
-                          <SensorIcon className="h-4 w-4" style={{ color: sensor.color }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 text-sm">
-                            {sensor.name}
-                            {sensor.pins.length > 1 && (
-                              <span className="text-gray-400 font-normal"> - {sensorPin.name}</span>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate">
-                            {sensorPin.description}
-                          </div>
-                        </div>
-                        {isCompatible && (
-                          <div className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
-                            Compatible
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })}
+          {aquaponicsSensors.length === 0 && (
+            <div className="text-center py-6 text-gray-400 text-sm">
+              No compatible sensors for this device type
             </div>
-          </Tabs.Content>
-        ))}
-      </Tabs.Root>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

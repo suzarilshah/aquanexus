@@ -44,7 +44,19 @@ import {
   Globe,
   Lock,
   RefreshCw,
+  Loader2,
+  HardDrive,
 } from 'lucide-react';
+
+// Device type from API
+interface Device {
+  id: string;
+  deviceMac: string;
+  deviceName: string;
+  deviceType: 'fish' | 'plant';
+  apiKey: string;
+  status: string;
+}
 
 type ConfigStep = 'board' | 'pins' | 'settings' | 'flash';
 
@@ -325,8 +337,9 @@ export default function FirmwareConfiguratorPage() {
   const [deviceType, setDeviceType] = useState<'fish' | 'plant' | 'general'>('fish');
   const [apiKey, setApiKey] = useState('');
   const [deviceMac, setDeviceMac] = useState('');
-  const [serverHost, setServerHost] = useState('aquanexus.vercel.app');
-  const [serverPort, setServerPort] = useState(443);
+  // Pre-defined server configuration for Vercel deployment
+  const serverHost = 'aquanexus.vercel.app';
+  const serverPort = 443;
   const [sensorInterval, setSensorInterval] = useState(10000);
   const [useAbly, setUseAbly] = useState(true);
   const [enableOTA, setEnableOTA] = useState(false);
@@ -337,9 +350,44 @@ export default function FirmwareConfiguratorPage() {
   const [copied, setCopied] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  // Device selection state
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [loadingDevices, setLoadingDevices] = useState(true);
+
+  // Fetch devices on mount
   useEffect(() => {
     setMounted(true);
+
+    async function fetchDevices() {
+      try {
+        const res = await fetch('/api/devices');
+        if (res.ok) {
+          const data = await res.json();
+          setDevices(data.devices || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch devices:', error);
+      } finally {
+        setLoadingDevices(false);
+      }
+    }
+
+    fetchDevices();
   }, []);
+
+  // Update API key and MAC when device is selected
+  useEffect(() => {
+    if (selectedDeviceId) {
+      const device = devices.find(d => d.id === selectedDeviceId);
+      if (device) {
+        setApiKey(device.apiKey);
+        setDeviceMac(device.deviceMac);
+        setDeviceType(device.deviceType);
+        setDeviceName(device.deviceName);
+      }
+    }
+  }, [selectedDeviceId, devices]);
 
   const board = useMemo(() => getBoard(selectedBoardId), [selectedBoardId]);
 
@@ -565,6 +613,7 @@ export default function FirmwareConfiguratorPage() {
                         assignments={assignments}
                         onAssign={handleAssign}
                         onUnassign={handleUnassign}
+                        deviceType={deviceType === 'general' ? 'general' : deviceType}
                       />
                     </PremiumCard>
                   </Tabs.Content>
@@ -593,63 +642,121 @@ export default function FirmwareConfiguratorPage() {
               {/* Step 3: Settings */}
               {currentStep === 'settings' && (
                 <div className="space-y-6">
-                  {/* API Connection - CRITICAL */}
+                  {/* Device Selection - NEW */}
                   <PremiumCard glow className="p-6 border-cyan-200">
                     <SettingsSection
-                      title="API Connection"
-                      icon={Key}
-                      description="Connect your device to AquaNexus cloud"
+                      title="Device Connection"
+                      icon={HardDrive}
+                      description="Select a registered device from your dashboard"
                     >
                       <div className="mt-4 space-y-4">
-                        {/* API Key */}
+                        {/* Device Selector */}
                         <div className="space-y-2">
-                          <Label htmlFor="apiKey" className="flex items-center gap-2">
-                            <Shield className="h-4 w-4 text-cyan-500" />
-                            API Key
+                          <Label htmlFor="deviceSelect" className="flex items-center gap-2">
+                            <HardDrive className="h-4 w-4 text-cyan-500" />
+                            Select Device
                             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
                               Required
                             </span>
                           </Label>
-                          <div className="relative">
-                            <Input
-                              id="apiKey"
-                              type={showApiKey ? "text" : "password"}
-                              value={apiKey}
-                              onChange={(e) => setApiKey(e.target.value)}
-                              placeholder="Enter your device API key from dashboard"
-                              className="pr-10 font-mono text-sm rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowApiKey(!showApiKey)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                              {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            Find this in Dashboard → Devices → Your Device → Copy API Key
-                          </p>
+
+                          {loadingDevices ? (
+                            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                              <Loader2 className="h-4 w-4 animate-spin text-cyan-500" />
+                              <span className="text-sm text-gray-500">Loading devices...</span>
+                            </div>
+                          ) : devices.length === 0 ? (
+                            <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                              <div className="flex items-start gap-3">
+                                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-sm font-medium text-amber-800">No devices registered</p>
+                                  <p className="text-xs text-amber-600 mt-1">
+                                    Go to Dashboard → Devices → Add Device to register a new device first.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <Select.Root value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+                              <Select.Trigger className="flex h-12 w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:border-cyan-500">
+                                <div className="flex items-center gap-3">
+                                  {selectedDeviceId ? (
+                                    <>
+                                      {devices.find(d => d.id === selectedDeviceId)?.deviceType === 'fish' && <Fish className="h-4 w-4 text-cyan-500" />}
+                                      {devices.find(d => d.id === selectedDeviceId)?.deviceType === 'plant' && <Leaf className="h-4 w-4 text-emerald-500" />}
+                                      <div className="text-left">
+                                        <div className="font-medium">{devices.find(d => d.id === selectedDeviceId)?.deviceName}</div>
+                                        <div className="text-xs text-gray-400 font-mono">{devices.find(d => d.id === selectedDeviceId)?.deviceMac}</div>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <span className="text-gray-400">Choose a device...</span>
+                                  )}
+                                </div>
+                                <Select.Icon>
+                                  <ChevronDown className="h-4 w-4 opacity-50" />
+                                </Select.Icon>
+                              </Select.Trigger>
+                              <Select.Portal>
+                                <Select.Content className="overflow-hidden bg-white rounded-xl shadow-2xl border border-gray-200 z-50">
+                                  <Select.Viewport className="p-2">
+                                    {devices.map((device) => (
+                                      <Select.Item
+                                        key={device.id}
+                                        value={device.id}
+                                        className="px-3 py-3 text-sm cursor-pointer hover:bg-cyan-50 rounded-lg outline-none flex items-center gap-3"
+                                      >
+                                        {device.deviceType === 'fish' && <Fish className="h-4 w-4 text-cyan-500" />}
+                                        {device.deviceType === 'plant' && <Leaf className="h-4 w-4 text-emerald-500" />}
+                                        <div className="flex-1">
+                                          <div className="font-medium text-gray-900">{device.deviceName}</div>
+                                          <div className="text-xs text-gray-500 font-mono">{device.deviceMac}</div>
+                                        </div>
+                                        <Select.ItemIndicator>
+                                          <Check className="h-4 w-4 text-cyan-500" />
+                                        </Select.ItemIndicator>
+                                      </Select.Item>
+                                    ))}
+                                  </Select.Viewport>
+                                </Select.Content>
+                              </Select.Portal>
+                            </Select.Root>
+                          )}
                         </div>
 
-                        {/* Device MAC */}
-                        <div className="space-y-2">
-                          <Label htmlFor="deviceMac" className="flex items-center gap-2">
-                            <Globe className="h-4 w-4 text-cyan-500" />
-                            Device MAC Address
-                            <span className="text-[10px] text-gray-400">(Optional)</span>
-                          </Label>
-                          <Input
-                            id="deviceMac"
-                            value={deviceMac}
-                            onChange={(e) => setDeviceMac(e.target.value)}
-                            placeholder="AA:BB:CC:DD:EE:FF (auto-detected if empty)"
-                            className="font-mono text-sm rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20"
-                          />
-                          <p className="text-xs text-gray-500">
-                            Leave empty to use ESP32&apos;s built-in MAC address
-                          </p>
-                        </div>
+                        {/* Selected Device Info */}
+                        {selectedDeviceId && (
+                          <div className="bg-gradient-to-br from-emerald-50 to-cyan-50 rounded-xl p-4 border border-emerald-100">
+                            <div className="flex items-start gap-3">
+                              <Check className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                              <div className="space-y-2 flex-1">
+                                <p className="text-emerald-800 font-medium">
+                                  Device Connected
+                                </p>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <div className="bg-white/60 rounded-lg px-3 py-2">
+                                    <span className="text-gray-500">API Key</span>
+                                    <div className="font-mono text-gray-700 flex items-center gap-1">
+                                      {showApiKey ? apiKey.slice(0, 16) + '...' : '••••••••••••••••'}
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowApiKey(!showApiKey)}
+                                        className="text-gray-400 hover:text-gray-600 ml-1"
+                                      >
+                                        {showApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className="bg-white/60 rounded-lg px-3 py-2">
+                                    <span className="text-gray-500">MAC Address</span>
+                                    <div className="font-mono text-gray-700">{deviceMac}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Connection Info Box */}
                         <div className="bg-gradient-to-br from-cyan-50 to-teal-50 rounded-xl p-4 border border-cyan-100">
@@ -760,30 +867,21 @@ export default function FirmwareConfiguratorPage() {
                     </div>
                   </PremiumCard>
 
-                  {/* Server & Connectivity */}
+                  {/* Connectivity Options */}
                   <PremiumCard glow className="p-6">
-                    <SettingsSection title="Server Connection" icon={Server}>
+                    <SettingsSection title="Connectivity" icon={Server}>
                       <div className="mt-4 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="serverHost">Server Host</Label>
-                            <Input
-                              id="serverHost"
-                              value={serverHost}
-                              onChange={(e) => setServerHost(e.target.value)}
-                              placeholder="aquanexus.vercel.app"
-                              className="rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="serverPort">Port</Label>
-                            <Input
-                              id="serverPort"
-                              type="number"
-                              value={serverPort}
-                              onChange={(e) => setServerPort(parseInt(e.target.value) || 443)}
-                              className="rounded-xl border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/20"
-                            />
+                        {/* Pre-defined server info */}
+                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-xs text-gray-500">Server Host</Label>
+                              <div className="font-mono text-sm text-gray-700 mt-1">{serverHost}</div>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-gray-500">Port (HTTPS)</Label>
+                              <div className="font-mono text-sm text-gray-700 mt-1">{serverPort}</div>
+                            </div>
                           </div>
                         </div>
 

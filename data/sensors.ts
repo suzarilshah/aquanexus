@@ -584,3 +584,26 @@ export function getSensorsByCategory(category: SensorCategory): SensorDefinition
 export function getAllSensorCategories(): SensorCategory[] {
   return Object.keys(SENSOR_CATEGORIES) as SensorCategory[];
 }
+
+// Aquaponics sensor IDs based on actual CSV dataset parameters
+export const AQUAPONICS_SENSORS = {
+  // Fish environment: water temperature (°C), pH, EC/TDS (µS/cm, mg/L), turbidity (NTU)
+  fish: ['ds18b20', 'ph-sensor', 'tds-sensor', 'turbidity-sensor'],
+  // Plant environment: plant height (cm), air temp (°C), humidity (RH), pressure (Pa)
+  plant: ['hcsr04', 'bme280'],
+};
+
+export function getAquaponicsSensors(deviceType: 'fish' | 'plant' | 'general'): SensorDefinition[] {
+  if (deviceType === 'general') {
+    // Return all aquaponics sensors for general
+    const allIds = [...AQUAPONICS_SENSORS.fish, ...AQUAPONICS_SENSORS.plant];
+    return SENSORS.filter((s) => allIds.includes(s.id));
+  }
+  const sensorIds = AQUAPONICS_SENSORS[deviceType] || [];
+  return SENSORS.filter((s) => sensorIds.includes(s.id));
+}
+
+export function isAquaponicsSensor(sensorId: string): boolean {
+  const allIds = [...AQUAPONICS_SENSORS.fish, ...AQUAPONICS_SENSORS.plant];
+  return allIds.includes(sensorId);
+}
