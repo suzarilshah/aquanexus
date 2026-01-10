@@ -153,6 +153,22 @@ export const mlModels = pgTable('ml_models', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Virtual device configuration table - for server-side streaming
+export const virtualDeviceConfig = pgTable('virtual_device_config', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  enabled: boolean('enabled').default(false).notNull(),
+  fishDeviceId: uuid('fish_device_id').references(() => devices.id),
+  plantDeviceId: uuid('plant_device_id').references(() => devices.id),
+  dataSource: varchar('data_source', { length: 50 }).default('training'),
+  speedMultiplier: integer('speed_multiplier').default(1),
+  currentFishIndex: integer('current_fish_index').default(0),
+  currentPlantIndex: integer('current_plant_index').default(0),
+  lastStreamedAt: timestamp('last_streamed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Training datasets table - tracks data used for training
 export const trainingDatasets = pgTable('training_datasets', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -204,3 +220,5 @@ export type TrainingDataset = typeof trainingDatasets.$inferSelect;
 export type NewTrainingDataset = typeof trainingDatasets.$inferInsert;
 export type HourlyAggregate = typeof hourlyAggregates.$inferSelect;
 export type NewHourlyAggregate = typeof hourlyAggregates.$inferInsert;
+export type VirtualDeviceConfig = typeof virtualDeviceConfig.$inferSelect;
+export type NewVirtualDeviceConfig = typeof virtualDeviceConfig.$inferInsert;

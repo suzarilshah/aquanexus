@@ -20,19 +20,20 @@ interface TelemetryPayload {
   status?: string;
 }
 
-// Define thresholds for alerts
+// Define thresholds for alerts (only for parameters in the CSV dataset)
 const THRESHOLDS = {
   fish: {
-    temperature: { min: 20, max: 30, critical: { min: 18, max: 32 } },
+    temperature: { min: 22, max: 28, critical: { min: 18, max: 32 } },
     ph: { min: 6.5, max: 8.0, critical: { min: 6.0, max: 8.5 } },
-    dissolvedOxygen: { min: 5, max: 12, critical: { min: 4, max: 15 } },
-    turbidity: { min: 0, max: 5, critical: { min: 0, max: 10 } },
+    ecValue: { min: 200, max: 800, critical: { min: 100, max: 1000 } },
+    turbidity: { min: 0, max: 20, critical: { min: 0, max: 30 } },
+    tds: { min: 100, max: 500, critical: { min: 50, max: 700 } },
   },
   plant: {
-    soilMoisture: { min: 30, max: 70, critical: { min: 20, max: 80 } },
-    lightLevel: { min: 1000, max: 50000, critical: { min: 500, max: 60000 } },
-    temperature: { min: 18, max: 30, critical: { min: 15, max: 35 } },
+    temperature: { min: 18, max: 32, critical: { min: 15, max: 35 } },
     humidity: { min: 40, max: 80, critical: { min: 30, max: 90 } },
+    pressure: { min: 95000, max: 105000, critical: { min: 90000, max: 110000 } },
+    // height has no threshold - it's a measurement, not a health indicator
   },
 };
 
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
     }> = [];
 
     if (readingType === 'fish') {
-      // Parse fish readings
+      // Parse fish readings (only CSV dataset parameters)
       const fishData: Record<string, number> = {};
       readings.forEach((reading) => {
         switch (reading.type) {
@@ -140,9 +141,10 @@ export async function POST(request: Request) {
           case 'ph':
             fishData.ph = reading.value;
             break;
-          case 'dissolved_oxygen':
-          case 'dissolvedOxygen':
-            fishData.dissolvedOxygen = reading.value;
+          case 'ecValue':
+          case 'ec_value':
+          case 'ec':
+            fishData.ecValue = reading.value;
             break;
           case 'turbidity':
             fishData.turbidity = reading.value;
@@ -158,7 +160,7 @@ export async function POST(request: Request) {
         deviceId: device[0].id,
         temperature: fishData.temperature?.toString(),
         ph: fishData.ph?.toString(),
-        dissolvedOxygen: fishData.dissolvedOxygen?.toString(),
+        ecValue: fishData.ecValue?.toString(),
         turbidity: fishData.turbidity?.toString(),
         tds: fishData.tds?.toString(),
         timestamp: new Date(),
@@ -188,17 +190,14 @@ export async function POST(request: Request) {
       });
 
     } else if (readingType === 'plant') {
-      // Parse plant readings
+      // Parse plant readings (only CSV dataset parameters)
       const plantData: Record<string, number> = {};
       readings.forEach((reading) => {
         switch (reading.type) {
-          case 'soil_moisture':
-          case 'soilMoisture':
-            plantData.soilMoisture = reading.value;
-            break;
-          case 'light_level':
-          case 'lightLevel':
-            plantData.lightLevel = reading.value;
+          case 'height':
+          case 'plant_height':
+          case 'plantHeight':
+            plantData.height = reading.value;
             break;
           case 'temperature':
             plantData.temperature = reading.value;
@@ -206,10 +205,8 @@ export async function POST(request: Request) {
           case 'humidity':
             plantData.humidity = reading.value;
             break;
-          case 'height':
-          case 'plant_height':
-          case 'plantHeight':
-            plantData.height = reading.value;
+          case 'pressure':
+            plantData.pressure = reading.value;
             break;
         }
       });
@@ -219,11 +216,10 @@ export async function POST(request: Request) {
       // Insert plant reading
       await db.insert(plantReadings).values({
         deviceId: device[0].id,
-        soilMoisture: plantData.soilMoisture?.toString(),
-        lightLevel: plantData.lightLevel?.toString(),
+        height: plantData.height?.toString(),
         temperature: plantData.temperature?.toString(),
         humidity: plantData.humidity?.toString(),
-        height: plantData.height?.toString(),
+        pressure: plantData.pressure?.toString(),
         timestamp: currentTimestamp,
       });
 

@@ -102,6 +102,11 @@ function addVariation(value: number, variationPercent: number = 2): number {
 
 /**
  * Generate plant sensor readings from a data row
+ * ONLY returns parameters that exist in the CSV dataset:
+ * - Height (cm)
+ * - Temperature (°C)
+ * - Humidity (%)
+ * - Pressure (Pa)
  */
 export function generatePlantReadings(row: PlantDataRow): SensorReading[] {
   const timestamp = new Date().toISOString();
@@ -109,7 +114,7 @@ export function generatePlantReadings(row: PlantDataRow): SensorReading[] {
   return [
     {
       type: 'height',
-      value: addVariation(row.height, 1), // Small variation for height
+      value: addVariation(row.height, 1),
       unit: 'cm',
       timestamp,
     },
@@ -126,15 +131,9 @@ export function generatePlantReadings(row: PlantDataRow): SensorReading[] {
       timestamp,
     },
     {
-      type: 'soilMoisture',
-      value: addVariation(row.humidity * 0.8, 5), // Derive soil moisture from humidity
-      unit: '%',
-      timestamp,
-    },
-    {
-      type: 'lightLevel',
-      value: addVariation(15000 + Math.random() * 20000, 10), // Simulate daylight cycle
-      unit: 'lux',
+      type: 'pressure',
+      value: addVariation(row.pressure, 0.1),
+      unit: 'Pa',
       timestamp,
     },
   ];
@@ -142,6 +141,12 @@ export function generatePlantReadings(row: PlantDataRow): SensorReading[] {
 
 /**
  * Generate fish sensor readings from a data row
+ * ONLY returns parameters that exist in the CSV dataset:
+ * - Temperature (°C)
+ * - EC Value (µS/cm)
+ * - TDS (mg/L)
+ * - Turbidity (NTU)
+ * - pH
  */
 export function generateFishReadings(row: FishDataRow): SensorReading[] {
   const timestamp = new Date().toISOString();
@@ -154,14 +159,14 @@ export function generateFishReadings(row: FishDataRow): SensorReading[] {
       timestamp,
     },
     {
-      type: 'ph',
-      value: addVariation(row.waterPh, 3),
-      unit: '',
+      type: 'ecValue',
+      value: addVariation(row.ecValue, 3),
+      unit: 'µS/cm',
       timestamp,
     },
     {
-      type: 'dissolved_oxygen',
-      value: addVariation(7.5, 10), // Typical DO value
+      type: 'tds',
+      value: addVariation(row.tds, 3),
       unit: 'mg/L',
       timestamp,
     },
@@ -172,9 +177,9 @@ export function generateFishReadings(row: FishDataRow): SensorReading[] {
       timestamp,
     },
     {
-      type: 'tds',
-      value: addVariation(row.tds, 3),
-      unit: 'mg/L',
+      type: 'ph',
+      value: addVariation(row.waterPh, 2),
+      unit: '',
       timestamp,
     },
   ];

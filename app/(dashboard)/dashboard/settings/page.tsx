@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Save, TestTube, CheckCircle, XCircle, Loader2, Brain, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, TestTube, CheckCircle, XCircle, Loader2, Brain, AlertTriangle, ChevronDown, ChevronUp, Radio, Fish, Leaf, Trash2, Power } from 'lucide-react';
 
 interface AIConfig {
   model1Name: string;
@@ -27,6 +27,14 @@ interface ConnectionError {
   suggestion?: string;
   timestamp?: string;
   details?: string;
+}
+
+interface VirtualDeviceConfig {
+  enabled: boolean;
+  dataSource: string;
+  speedMultiplier: number;
+  fishDevice: { id: string; name: string; mac: string } | null;
+  plantDevice: { id: string; name: string; mac: string } | null;
 }
 
 export default function SettingsPage() {
@@ -56,8 +64,20 @@ export default function SettingsPage() {
     model2: boolean;
   }>({ model1: false, model2: false });
 
+  // Virtual device state
+  const [virtualConfig, setVirtualConfig] = useState<VirtualDeviceConfig>({
+    enabled: false,
+    dataSource: 'training',
+    speedMultiplier: 1,
+    fishDevice: null,
+    plantDevice: null,
+  });
+  const [isVirtualSaving, setIsVirtualSaving] = useState(false);
+  const [isVirtualDeleting, setIsVirtualDeleting] = useState(false);
+
   useEffect(() => {
     fetchConfig();
+    fetchVirtualConfig();
   }, []);
 
   const renderErrorDetails = (modelKey: 'model1' | 'model2') => {
@@ -137,6 +157,85 @@ export default function SettingsPage() {
       toast.error('Failed to load configuration');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchVirtualConfig = async () => {
+    try {
+      const res = await fetch('/api/virtual-devices');
+      const data = await res.json();
+      if (data) {
+        setVirtualConfig({
+          enabled: data.config?.enabled || false,
+          dataSource: data.config?.dataSource || 'training',
+          speedMultiplier: data.config?.speedMultiplier || 1,
+          fishDevice: data.fishDevice,
+          plantDevice: data.plantDevice,
+        });
+      }
+    } catch {
+      // Silent fail for virtual config
+    }
+  };
+
+  const handleVirtualDeviceSave = async () => {
+    setIsVirtualSaving(true);
+    try {
+      const res = await fetch('/api/virtual-devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: virtualConfig.enabled,
+          dataSource: virtualConfig.dataSource,
+          speedMultiplier: virtualConfig.speedMultiplier,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save');
+      }
+
+      toast.success(data.message);
+      // Refresh to get new device IDs
+      await fetchVirtualConfig();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save configuration');
+    } finally {
+      setIsVirtualSaving(false);
+    }
+  };
+
+  const handleVirtualDeviceDelete = async () => {
+    if (!confirm('Are you sure you want to remove all virtual devices and their data?')) {
+      return;
+    }
+
+    setIsVirtualDeleting(true);
+    try {
+      const res = await fetch('/api/virtual-devices', {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete');
+      }
+
+      toast.success(data.message);
+      setVirtualConfig({
+        enabled: false,
+        dataSource: 'training',
+        speedMultiplier: 1,
+        fishDevice: null,
+        plantDevice: null,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete virtual devices');
+    } finally {
+      setIsVirtualDeleting(false);
     }
   };
 
@@ -462,6 +561,152 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Virtual ESP32 Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-purple-100 to-indigo-100">
+              <Radio className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <CardTitle>Virtual ESP32 Devices</CardTitle>
+              <CardDescription>
+                Enable virtual devices to simulate sensor data streaming for testing
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Enable Toggle */}
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <Power className={`h-5 w-5 ${virtualConfig.enabled ? 'text-green-500' : 'text-gray-400'}`} />
+              <div>
+                <h3 className="font-medium text-gray-900">Enable Virtual Streaming</h3>
+                <p className="text-sm text-gray-500">
+                  Automatically stream training data to dashboards via cron-job.org
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setVirtualConfig({ ...virtualConfig, enabled: !virtualConfig.enabled })}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                virtualConfig.enabled ? 'bg-green-500' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  virtualConfig.enabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Device Status */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Fish Device */}
+            <div className={`rounded-lg border p-4 ${virtualConfig.fishDevice ? 'border-cyan-200 bg-cyan-50' : 'border-gray-200 bg-gray-50'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Fish className="h-5 w-5 text-cyan-500" />
+                <span className="font-medium text-gray-900">Fish Sensor</span>
+              </div>
+              {virtualConfig.fishDevice ? (
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-700">{virtualConfig.fishDevice.name}</p>
+                  <p className="text-xs text-gray-500 font-mono">{virtualConfig.fishDevice.mac}</p>
+                  <div className="flex items-center gap-1 mt-2">
+                    <span className={`h-2 w-2 rounded-full ${virtualConfig.enabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                    <span className="text-xs text-gray-600">{virtualConfig.enabled ? 'Streaming' : 'Idle'}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Not created yet</p>
+              )}
+            </div>
+
+            {/* Plant Device */}
+            <div className={`rounded-lg border p-4 ${virtualConfig.plantDevice ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Leaf className="h-5 w-5 text-green-500" />
+                <span className="font-medium text-gray-900">Plant Sensor</span>
+              </div>
+              {virtualConfig.plantDevice ? (
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-700">{virtualConfig.plantDevice.name}</p>
+                  <p className="text-xs text-gray-500 font-mono">{virtualConfig.plantDevice.mac}</p>
+                  <div className="flex items-center gap-1 mt-2">
+                    <span className={`h-2 w-2 rounded-full ${virtualConfig.enabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                    <span className="text-xs text-gray-600">{virtualConfig.enabled ? 'Streaming' : 'Idle'}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Not created yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Configuration Options */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="dataSource">Data Source</Label>
+              <select
+                id="dataSource"
+                value={virtualConfig.dataSource}
+                onChange={(e) => setVirtualConfig({ ...virtualConfig, dataSource: e.target.value })}
+                className="mt-1 w-full h-10 px-3 rounded-md border border-gray-200 text-sm bg-white"
+              >
+                <option value="training">Training Data (plant_initial.csv, fish_initial.csv)</option>
+                <option value="validation">Validation Data</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="speedMultiplier">Speed Multiplier</Label>
+              <select
+                id="speedMultiplier"
+                value={virtualConfig.speedMultiplier}
+                onChange={(e) => setVirtualConfig({ ...virtualConfig, speedMultiplier: parseInt(e.target.value) })}
+                className="mt-1 w-full h-10 px-3 rounded-md border border-gray-200 text-sm bg-white"
+              >
+                <option value="1">1x (Normal)</option>
+                <option value="2">2x (Faster)</option>
+                <option value="5">5x (Fast)</option>
+                <option value="10">10x (Very Fast)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={handleVirtualDeviceDelete}
+              disabled={isVirtualDeleting || (!virtualConfig.fishDevice && !virtualConfig.plantDevice)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              {isVirtualDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Remove Virtual Devices
+            </Button>
+            <Button onClick={handleVirtualDeviceSave} disabled={isVirtualSaving}>
+              {isVirtualSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Configuration
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Info Card */}
       <Card className="bg-blue-50 border-blue-200">
         <CardContent className="pt-6">
@@ -478,6 +723,26 @@ export default function SettingsPage() {
                 analyses. This provides an agreement score, error margin, and calibration
                 score to help validate the accuracy of insights. Higher agreement scores
                 indicate more reliable predictions.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Virtual Device Info */}
+      <Card className="bg-purple-50 border-purple-200">
+        <CardContent className="pt-6">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <Radio className="h-5 w-5 text-purple-400" />
+            </div>
+            <div className="text-sm text-purple-700">
+              <p className="font-medium">About Virtual Devices</p>
+              <p className="mt-1">
+                Virtual devices simulate ESP32 sensors by streaming pre-recorded CSV training data
+                to your dashboards. This is triggered by an external cron service (cron-job.org)
+                which calls the API endpoint periodically, ensuring data flows even when your
+                browser is closed. The data appears in real-time on your Fish and Plant dashboards.
               </p>
             </div>
           </div>

@@ -6,7 +6,7 @@ import { Thermometer, Droplets, Wind, Activity, Zap } from 'lucide-react';
 interface FishSensorCardsProps {
   temperature: number | null;
   ph: number | null;
-  dissolvedOxygen: number | null;
+  ecValue: number | null;
   turbidity: number | null;
   tds: number | null;
 }
@@ -14,9 +14,9 @@ interface FishSensorCardsProps {
 const THRESHOLDS = {
   temperature: { min: 22, max: 28, unit: '°C' },
   ph: { min: 6.5, max: 8.0, unit: '' },
-  dissolvedOxygen: { min: 5, max: 12, unit: 'mg/L' },
-  turbidity: { min: 0, max: 5, unit: 'NTU' },
-  tds: { min: 200, max: 500, unit: 'ppm' },
+  ecValue: { min: 200, max: 800, unit: 'µS/cm' },
+  turbidity: { min: 0, max: 20, unit: 'NTU' },
+  tds: { min: 100, max: 500, unit: 'mg/L' },
 };
 
 function getStatus(value: number | null, threshold: { min: number; max: number }) {
@@ -42,7 +42,7 @@ function getStatusStyles(status: string) {
 export function FishSensorCards({
   temperature,
   ph,
-  dissolvedOxygen,
+  ecValue,
   turbidity,
   tds,
 }: FishSensorCardsProps) {
@@ -64,10 +64,10 @@ export function FishSensorCards({
       bgColor: 'bg-green-100',
     },
     {
-      name: 'Dissolved Oxygen',
-      value: dissolvedOxygen,
-      icon: Wind,
-      threshold: THRESHOLDS.dissolvedOxygen,
+      name: 'EC Value',
+      value: ecValue,
+      icon: Zap,
+      threshold: THRESHOLDS.ecValue,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
     },
@@ -82,7 +82,7 @@ export function FishSensorCards({
     {
       name: 'TDS',
       value: tds,
-      icon: Zap,
+      icon: Wind,
       threshold: THRESHOLDS.tds,
       color: 'text-orange-600',
       bgColor: 'bg-orange-100',
