@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Save, TestTube, CheckCircle, XCircle, Loader2, Brain, AlertTriangle, ChevronDown, ChevronUp, Radio, Fish, Leaf, Trash2, Power } from 'lucide-react';
+import { Save, TestTube, CheckCircle, XCircle, Loader2, Brain, AlertTriangle, ChevronDown, ChevronUp, Radio, Fish, Leaf, Trash2, Power, Cpu, ExternalLink } from 'lucide-react';
 
 interface AIConfig {
   model1Name: string;
@@ -29,12 +29,20 @@ interface ConnectionError {
   details?: string;
 }
 
+interface DeviceOption {
+  id: string;
+  name: string;
+  mac: string;
+  status: string;
+  isVirtual: boolean;
+}
+
 interface VirtualDeviceConfig {
   enabled: boolean;
   dataSource: string;
   speedMultiplier: number;
-  fishDevice: { id: string; name: string; mac: string } | null;
-  plantDevice: { id: string; name: string; mac: string } | null;
+  fishDeviceId: string | null;
+  plantDeviceId: string | null;
 }
 
 export default function SettingsPage() {
@@ -67,11 +75,13 @@ export default function SettingsPage() {
   // Virtual device state
   const [virtualConfig, setVirtualConfig] = useState<VirtualDeviceConfig>({
     enabled: false,
-    dataSource: 'training',
+    dataSource: 'validation',
     speedMultiplier: 1,
-    fishDevice: null,
-    plantDevice: null,
+    fishDeviceId: null,
+    plantDeviceId: null,
   });
+  const [fishDevices, setFishDevices] = useState<DeviceOption[]>([]);
+  const [plantDevices, setPlantDevices] = useState<DeviceOption[]>([]);
   const [isVirtualSaving, setIsVirtualSaving] = useState(false);
   const [isVirtualDeleting, setIsVirtualDeleting] = useState(false);
 
@@ -165,12 +175,14 @@ export default function SettingsPage() {
       const res = await fetch('/api/virtual-devices');
       const data = await res.json();
       if (data) {
+        setFishDevices(data.fishDevices || []);
+        setPlantDevices(data.plantDevices || []);
         setVirtualConfig({
           enabled: data.config?.enabled || false,
-          dataSource: data.config?.dataSource || 'training',
+          dataSource: data.config?.dataSource || 'validation',
           speedMultiplier: data.config?.speedMultiplier || 1,
-          fishDevice: data.fishDevice,
-          plantDevice: data.plantDevice,
+          fishDeviceId: data.config?.fishDeviceId || null,
+          plantDeviceId: data.config?.plantDeviceId || null,
         });
       }
     } catch {
@@ -186,6 +198,8 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           enabled: virtualConfig.enabled,
+          fishDeviceId: virtualConfig.fishDeviceId,
+          plantDeviceId: virtualConfig.plantDeviceId,
           dataSource: virtualConfig.dataSource,
           speedMultiplier: virtualConfig.speedMultiplier,
         }),
@@ -198,7 +212,6 @@ export default function SettingsPage() {
       }
 
       toast.success(data.message);
-      // Refresh to get new device IDs
       await fetchVirtualConfig();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to save configuration');
@@ -208,7 +221,7 @@ export default function SettingsPage() {
   };
 
   const handleVirtualDeviceDelete = async () => {
-    if (!confirm('Are you sure you want to remove all virtual devices and their data?')) {
+    if (!confirm('Are you sure you want to clear the virtual device configuration?')) {
       return;
     }
 
@@ -227,13 +240,13 @@ export default function SettingsPage() {
       toast.success(data.message);
       setVirtualConfig({
         enabled: false,
-        dataSource: 'training',
+        dataSource: 'validation',
         speedMultiplier: 1,
-        fishDevice: null,
-        plantDevice: null,
+        fishDeviceId: null,
+        plantDeviceId: null,
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete virtual devices');
+      toast.error(error instanceof Error ? error.message : 'Failed to clear configuration');
     } finally {
       setIsVirtualDeleting(false);
     }
@@ -273,17 +286,7 @@ export default function SettingsPage() {
       const apiVersion = modelNumber === 1 ? config.model1ApiVersion : config.model2ApiVersion;
       const modelName = modelNumber === 1 ? config.model1Name : config.model2Name;
 
-      // Debug log to verify modelName is being sent
-      console.log('[Test Connection] Sending request with:', {
-        modelNumber,
-        modelName,
-        endpoint,
-        apiVersion,
-        apiKeyLength: apiKey?.length || 0,
-      });
-
       const requestPayload = { modelNumber, modelName, endpoint, apiKey, apiVersion };
-      console.log('[Test Connection] Full payload (excluding apiKey):', { ...requestPayload, apiKey: '***' });
 
       const res = await fetch('/api/ai/config', {
         method: 'PUT',
@@ -328,6 +331,10 @@ export default function SettingsPage() {
     }
   };
 
+  const getSelectedDevice = (devices: DeviceOption[], deviceId: string | null) => {
+    return devices.find(d => d.id === deviceId) || null;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -336,15 +343,308 @@ export default function SettingsPage() {
     );
   }
 
+  const selectedFishDevice = getSelectedDevice(fishDevices, virtualConfig.fishDeviceId);
+  const selectedPlantDevice = getSelectedDevice(plantDevices, virtualConfig.plantDeviceId);
+
   return (
     <div className="space-y-6">
       {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Configure your AI models and system preferences
+          Configure your AI models and virtual device streaming
         </p>
       </div>
+
+      {/* Virtual ESP32 Configuration - Moved to top for prominence */}
+      <Card className="border-2 border-purple-200 shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50">
+          <div className="flex items-center space-x-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 shadow-lg">
+              <Radio className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-xl">Virtual Device Streaming</CardTitle>
+              <CardDescription>
+                Select registered devices to receive simulated sensor data
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6 pt-6">
+          {/* Master Enable Toggle */}
+          <div className="flex items-center justify-between rounded-xl border-2 border-gray-200 p-4 bg-gradient-to-r from-gray-50 to-white">
+            <div className="flex items-center gap-4">
+              <div className={`p-3 rounded-full ${virtualConfig.enabled ? 'bg-green-100' : 'bg-gray-100'}`}>
+                <Power className={`h-6 w-6 ${virtualConfig.enabled ? 'text-green-600' : 'text-gray-400'}`} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Enable Virtual Streaming</h3>
+                <p className="text-sm text-gray-500">
+                  Stream CSV data to selected devices for testing and validation
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setVirtualConfig({ ...virtualConfig, enabled: !virtualConfig.enabled })}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all duration-200 ${
+                virtualConfig.enabled
+                  ? 'bg-gradient-to-r from-green-400 to-green-500 shadow-lg shadow-green-200'
+                  : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform ${
+                  virtualConfig.enabled ? 'translate-x-7' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Device Selection Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Fish Device Selection */}
+            <div className="rounded-xl border-2 border-cyan-200 bg-gradient-to-br from-cyan-50 to-blue-50 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500">
+                  <Fish className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Fish Sensor Device</h3>
+                  <p className="text-xs text-gray-500">Select a fish device to receive virtual data</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="fishDevice" className="text-sm font-medium text-gray-700">
+                  Select Device
+                </Label>
+                <select
+                  id="fishDevice"
+                  value={virtualConfig.fishDeviceId || ''}
+                  onChange={(e) => setVirtualConfig({
+                    ...virtualConfig,
+                    fishDeviceId: e.target.value || null
+                  })}
+                  className="w-full h-12 px-4 rounded-lg border-2 border-cyan-200 text-sm bg-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                >
+                  <option value="">-- Select a fish device --</option>
+                  {fishDevices.map((device) => (
+                    <option key={device.id} value={device.id}>
+                      {device.name} ({device.mac}) {device.isVirtual ? '- Virtual' : ''}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedFishDevice ? (
+                  <div className="bg-white rounded-lg p-3 border border-cyan-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{selectedFishDevice.name}</p>
+                        <p className="text-xs text-gray-500 font-mono">{selectedFishDevice.mac}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${
+                          virtualConfig.enabled && virtualConfig.fishDeviceId
+                            ? 'bg-green-500 animate-pulse'
+                            : 'bg-gray-300'
+                        }`} />
+                        <span className="text-xs font-medium text-gray-600">
+                          {virtualConfig.enabled && virtualConfig.fishDeviceId ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white/50 rounded-lg p-3 border border-dashed border-cyan-200 text-center">
+                    <p className="text-sm text-gray-500">No device selected</p>
+                    <a href="/dashboard/devices" className="text-xs text-cyan-600 hover:underline">
+                      Register a new device
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Plant Device Selection */}
+            <div className="rounded-xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500">
+                  <Leaf className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Plant Sensor Device</h3>
+                  <p className="text-xs text-gray-500">Select a plant device to receive virtual data</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="plantDevice" className="text-sm font-medium text-gray-700">
+                  Select Device
+                </Label>
+                <select
+                  id="plantDevice"
+                  value={virtualConfig.plantDeviceId || ''}
+                  onChange={(e) => setVirtualConfig({
+                    ...virtualConfig,
+                    plantDeviceId: e.target.value || null
+                  })}
+                  className="w-full h-12 px-4 rounded-lg border-2 border-green-200 text-sm bg-white focus:border-green-400 focus:ring-2 focus:ring-green-100 transition-all"
+                >
+                  <option value="">-- Select a plant device --</option>
+                  {plantDevices.map((device) => (
+                    <option key={device.id} value={device.id}>
+                      {device.name} ({device.mac}) {device.isVirtual ? '- Virtual' : ''}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedPlantDevice ? (
+                  <div className="bg-white rounded-lg p-3 border border-green-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{selectedPlantDevice.name}</p>
+                        <p className="text-xs text-gray-500 font-mono">{selectedPlantDevice.mac}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${
+                          virtualConfig.enabled && virtualConfig.plantDeviceId
+                            ? 'bg-green-500 animate-pulse'
+                            : 'bg-gray-300'
+                        }`} />
+                        <span className="text-xs font-medium text-gray-600">
+                          {virtualConfig.enabled && virtualConfig.plantDeviceId ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white/50 rounded-lg p-3 border border-dashed border-green-200 text-center">
+                    <p className="text-sm text-gray-500">No device selected</p>
+                    <a href="/dashboard/devices" className="text-xs text-green-600 hover:underline">
+                      Register a new device
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Data Configuration */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div>
+              <Label htmlFor="dataSource" className="text-sm font-medium text-gray-700">Data Source</Label>
+              <select
+                id="dataSource"
+                value={virtualConfig.dataSource}
+                onChange={(e) => setVirtualConfig({ ...virtualConfig, dataSource: e.target.value })}
+                className="mt-2 w-full h-11 px-4 rounded-lg border border-gray-200 text-sm bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+              >
+                <option value="training">Training Data (fish/plant_initial.csv)</option>
+                <option value="validation">Validation Data (fish/plant_validate.csv)</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                {virtualConfig.dataSource === 'validation'
+                  ? 'Validation data for testing LSTM model predictions'
+                  : 'Training data for initial model development'}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="speedMultiplier" className="text-sm font-medium text-gray-700">Streaming Speed</Label>
+              <select
+                id="speedMultiplier"
+                value={virtualConfig.speedMultiplier}
+                onChange={(e) => setVirtualConfig({ ...virtualConfig, speedMultiplier: parseInt(e.target.value) })}
+                className="mt-2 w-full h-11 px-4 rounded-lg border border-gray-200 text-sm bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+              >
+                <option value="1">1x (Normal - 1 reading/minute)</option>
+                <option value="2">2x (Faster)</option>
+                <option value="5">5x (Fast)</option>
+                <option value="10">10x (Very Fast)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <a
+              href="/dashboard/simulator"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-500 text-sm font-medium text-white hover:from-purple-600 hover:to-indigo-600 transition-all shadow-md hover:shadow-lg"
+            >
+              <Cpu className="h-4 w-4" />
+              Open Manual Simulator
+            </a>
+            <a
+              href="/dashboard/devices"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Manage Devices
+            </a>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <Button
+              variant="outline"
+              onClick={handleVirtualDeviceDelete}
+              disabled={isVirtualDeleting || (!virtualConfig.fishDeviceId && !virtualConfig.plantDeviceId)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+            >
+              {isVirtualDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Clear Configuration
+            </Button>
+            <Button
+              onClick={handleVirtualDeviceSave}
+              disabled={isVirtualSaving}
+              className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+            >
+              {isVirtualSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Configuration
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Streaming API Info */}
+      <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+        <CardContent className="pt-6">
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0 p-2 bg-purple-100 rounded-lg">
+              <Radio className="h-5 w-5 text-purple-600" />
+            </div>
+            <div className="text-sm text-purple-700 space-y-3 flex-1">
+              <p className="font-semibold text-purple-900">Automatic Streaming with Cron</p>
+              <p>
+                For continuous data streaming without keeping the browser open, set up an external cron service
+                (like cron-job.org) to call the streaming API endpoint every minute.
+              </p>
+              <div className="bg-white/70 rounded-lg p-3 border border-purple-100">
+                <p className="font-medium text-purple-800 mb-2">Streaming API Endpoint:</p>
+                <code className="block text-xs bg-purple-100 px-3 py-2 rounded-lg font-mono break-all">
+                  GET https://app.airail.uk/api/virtual-devices/stream
+                </code>
+                <p className="text-xs mt-2 text-purple-600">
+                  This endpoint streams one data point from the selected CSV for each enabled device.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* AI Configuration */}
       <Card>
@@ -385,9 +685,7 @@ export default function SettingsPage() {
                 <Input
                   id="model1Name"
                   value={config.model1Name}
-                  onChange={(e) =>
-                    setConfig({ ...config, model1Name: e.target.value })
-                  }
+                  onChange={(e) => setConfig({ ...config, model1Name: e.target.value })}
                   placeholder="gpt-o3-mini"
                   className="mt-1"
                 />
@@ -397,30 +695,20 @@ export default function SettingsPage() {
                 <Input
                   id="model1Endpoint"
                   value={config.model1Endpoint}
-                  onChange={(e) =>
-                    setConfig({ ...config, model1Endpoint: e.target.value })
-                  }
+                  onChange={(e) => setConfig({ ...config, model1Endpoint: e.target.value })}
                   placeholder="https://your-foundry-endpoint/openai/deployments/gpt-o3-mini/chat/completions"
                   className="mt-1"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Enter the full Microsoft Foundry API endpoint URL
-                </p>
               </div>
               <div>
                 <Label htmlFor="model1ApiVersion">API Version</Label>
                 <Input
                   id="model1ApiVersion"
                   value={config.model1ApiVersion}
-                  onChange={(e) =>
-                    setConfig({ ...config, model1ApiVersion: e.target.value })
-                  }
+                  onChange={(e) => setConfig({ ...config, model1ApiVersion: e.target.value })}
                   placeholder="2024-02-15-preview"
                   className="mt-1"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Azure OpenAI API version (e.g., 2024-02-15-preview)
-                </p>
               </div>
               <div>
                 <Label htmlFor="model1ApiKey">API Key</Label>
@@ -428,9 +716,7 @@ export default function SettingsPage() {
                   id="model1ApiKey"
                   type="password"
                   value={config.model1ApiKey}
-                  onChange={(e) =>
-                    setConfig({ ...config, model1ApiKey: e.target.value })
-                  }
+                  onChange={(e) => setConfig({ ...config, model1ApiKey: e.target.value })}
                   placeholder="Enter API key"
                   className="mt-1"
                 />
@@ -463,9 +749,7 @@ export default function SettingsPage() {
                 <Input
                   id="model2Name"
                   value={config.model2Name}
-                  onChange={(e) =>
-                    setConfig({ ...config, model2Name: e.target.value })
-                  }
+                  onChange={(e) => setConfig({ ...config, model2Name: e.target.value })}
                   placeholder="deepseek-r1"
                   className="mt-1"
                 />
@@ -475,30 +759,20 @@ export default function SettingsPage() {
                 <Input
                   id="model2Endpoint"
                   value={config.model2Endpoint}
-                  onChange={(e) =>
-                    setConfig({ ...config, model2Endpoint: e.target.value })
-                  }
+                  onChange={(e) => setConfig({ ...config, model2Endpoint: e.target.value })}
                   placeholder="https://your-foundry-endpoint/models/deepseek-r1/chat/completions"
                   className="mt-1"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Enter the full Microsoft Foundry API endpoint URL
-                </p>
               </div>
               <div>
                 <Label htmlFor="model2ApiVersion">API Version</Label>
                 <Input
                   id="model2ApiVersion"
                   value={config.model2ApiVersion}
-                  onChange={(e) =>
-                    setConfig({ ...config, model2ApiVersion: e.target.value })
-                  }
+                  onChange={(e) => setConfig({ ...config, model2ApiVersion: e.target.value })}
                   placeholder="2024-02-15-preview"
                   className="mt-1"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Azure OpenAI API version (e.g., 2024-02-15-preview)
-                </p>
               </div>
               <div>
                 <Label htmlFor="model2ApiKey">API Key</Label>
@@ -506,9 +780,7 @@ export default function SettingsPage() {
                   id="model2ApiKey"
                   type="password"
                   value={config.model2ApiKey}
-                  onChange={(e) =>
-                    setConfig({ ...config, model2ApiKey: e.target.value })
-                  }
+                  onChange={(e) => setConfig({ ...config, model2ApiKey: e.target.value })}
                   placeholder="Enter API key"
                   className="mt-1"
                 />
@@ -527,9 +799,7 @@ export default function SettingsPage() {
               </p>
             </div>
             <button
-              onClick={() =>
-                setConfig({ ...config, consensusEnabled: !config.consensusEnabled })
-              }
+              onClick={() => setConfig({ ...config, consensusEnabled: !config.consensusEnabled })}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 config.consensusEnabled ? 'bg-blue-600' : 'bg-gray-200'
               }`}
@@ -546,174 +816,6 @@ export default function SettingsPage() {
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Configuration
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Virtual ESP32 Configuration */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-purple-100 to-indigo-100">
-              <Radio className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <CardTitle>Virtual ESP32 Devices</CardTitle>
-              <CardDescription>
-                Enable virtual devices to simulate sensor data streaming for testing
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Enable Toggle */}
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <Power className={`h-5 w-5 ${virtualConfig.enabled ? 'text-green-500' : 'text-gray-400'}`} />
-              <div>
-                <h3 className="font-medium text-gray-900">Enable Virtual Streaming</h3>
-                <p className="text-sm text-gray-500">
-                  Automatically stream training data to dashboards via cron-job.org
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setVirtualConfig({ ...virtualConfig, enabled: !virtualConfig.enabled })}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                virtualConfig.enabled ? 'bg-green-500' : 'bg-gray-200'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  virtualConfig.enabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* Device Status */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Fish Device */}
-            <div className={`rounded-lg border p-4 ${virtualConfig.fishDevice ? 'border-cyan-200 bg-cyan-50' : 'border-gray-200 bg-gray-50'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <Fish className="h-5 w-5 text-cyan-500" />
-                <span className="font-medium text-gray-900">Fish Sensor</span>
-              </div>
-              {virtualConfig.fishDevice ? (
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-700">{virtualConfig.fishDevice.name}</p>
-                  <p className="text-xs text-gray-500 font-mono">{virtualConfig.fishDevice.mac}</p>
-                  <div className="flex items-center gap-1 mt-2">
-                    <span className={`h-2 w-2 rounded-full ${virtualConfig.enabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-                    <span className="text-xs text-gray-600">{virtualConfig.enabled ? 'Streaming' : 'Idle'}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">Not created yet</p>
-              )}
-            </div>
-
-            {/* Plant Device */}
-            <div className={`rounded-lg border p-4 ${virtualConfig.plantDevice ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <Leaf className="h-5 w-5 text-green-500" />
-                <span className="font-medium text-gray-900">Plant Sensor</span>
-              </div>
-              {virtualConfig.plantDevice ? (
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-700">{virtualConfig.plantDevice.name}</p>
-                  <p className="text-xs text-gray-500 font-mono">{virtualConfig.plantDevice.mac}</p>
-                  <div className="flex items-center gap-1 mt-2">
-                    <span className={`h-2 w-2 rounded-full ${virtualConfig.enabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-                    <span className="text-xs text-gray-600">{virtualConfig.enabled ? 'Streaming' : 'Idle'}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">Not created yet</p>
-              )}
-            </div>
-          </div>
-
-          {/* Configuration Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="dataSource">Data Source</Label>
-              <select
-                id="dataSource"
-                value={virtualConfig.dataSource}
-                onChange={(e) => setVirtualConfig({ ...virtualConfig, dataSource: e.target.value })}
-                className="mt-1 w-full h-10 px-3 rounded-md border border-gray-200 text-sm bg-white"
-              >
-                <option value="training">Training Data (plant_initial.csv, fish_initial.csv)</option>
-                <option value="validation">Validation Data (plant_validate.csv, fish_validate.csv)</option>
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                {virtualConfig.dataSource === 'validation'
-                  ? 'Uses validation dataset for testing LSTM predictions'
-                  : 'Uses training dataset for model training'}
-              </p>
-            </div>
-            <div>
-              <Label htmlFor="speedMultiplier">Speed Multiplier</Label>
-              <select
-                id="speedMultiplier"
-                value={virtualConfig.speedMultiplier}
-                onChange={(e) => setVirtualConfig({ ...virtualConfig, speedMultiplier: parseInt(e.target.value) })}
-                className="mt-1 w-full h-10 px-3 rounded-md border border-gray-200 text-sm bg-white"
-              >
-                <option value="1">1x (Normal)</option>
-                <option value="2">2x (Faster)</option>
-                <option value="5">5x (Fast)</option>
-                <option value="10">10x (Very Fast)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className="flex flex-wrap gap-3 pt-2">
-            <a
-              href="/dashboard/simulator"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 text-sm font-medium text-purple-700 hover:from-purple-100 hover:to-indigo-100 transition-colors"
-            >
-              <Radio className="h-4 w-4" />
-              Open Simulator
-            </a>
-            <a
-              href="/dashboard/devices"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              View Devices
-            </a>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={handleVirtualDeviceDelete}
-              disabled={isVirtualDeleting || (!virtualConfig.fishDevice && !virtualConfig.plantDevice)}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-              {isVirtualDeleting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="mr-2 h-4 w-4" />
-              )}
-              Remove Virtual Devices
-            </Button>
-            <Button onClick={handleVirtualDeviceSave} disabled={isVirtualSaving}>
-              {isVirtualSaving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
@@ -746,43 +848,6 @@ export default function SettingsPage() {
                 score to help validate the accuracy of insights. Higher agreement scores
                 indicate more reliable predictions.
               </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Virtual Device Info */}
-      <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
-        <CardContent className="pt-6">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <Radio className="h-5 w-5 text-purple-500" />
-            </div>
-            <div className="text-sm text-purple-700 space-y-3">
-              <p className="font-semibold">About Virtual Devices</p>
-              <p>
-                Virtual devices simulate ESP32 sensors by streaming pre-recorded CSV data
-                to your dashboards. Data flows to Fish and Plant dashboards and feeds into
-                the LSTM model for growth predictions and forecasting.
-              </p>
-
-              <div className="bg-white/60 rounded-lg p-3 border border-purple-100">
-                <p className="font-medium text-purple-800 mb-2">Two ways to stream data:</p>
-                <ol className="list-decimal list-inside space-y-1 text-purple-700">
-                  <li><strong>Manual:</strong> Use the <a href="/dashboard/simulator" className="underline">Simulator page</a> to start/stop streaming</li>
-                  <li><strong>Automatic:</strong> Set up cron-job.org to call the streaming API every minute</li>
-                </ol>
-              </div>
-
-              <div className="bg-white/60 rounded-lg p-3 border border-purple-100">
-                <p className="font-medium text-purple-800 mb-1">Automatic Streaming API:</p>
-                <code className="block text-xs bg-purple-100 px-2 py-1 rounded font-mono break-all">
-                  GET /api/virtual-devices/stream
-                </code>
-                <p className="text-xs mt-1 text-purple-600">
-                  Configure this endpoint in cron-job.org to run every minute for continuous data streaming
-                </p>
-              </div>
             </div>
           </div>
         </CardContent>

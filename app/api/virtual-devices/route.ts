@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { virtualDeviceConfig, devices } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
-import { randomUUID } from 'crypto';
+import { eq } from 'drizzle-orm';
 
-// GET - Fetch virtual device configuration
+// GET - Fetch virtual device configuration and available devices
 export async function GET() {
   try {
     const session = await getSession();
@@ -20,27 +19,57 @@ export async function GET() {
       .where(eq(virtualDeviceConfig.userId, session.userId))
       .limit(1);
 
-    // Get virtual devices
+    // Get ALL user devices for selection
     const userDevices = await db
       .select()
       .from(devices)
       .where(eq(devices.userId, session.userId));
 
-    const fishDevice = userDevices.find(
-      (d) => d.deviceType === 'fish' && d.deviceMac.startsWith('VIRTUAL:')
-    );
-    const plantDevice = userDevices.find(
-      (d) => d.deviceType === 'plant' && d.deviceMac.startsWith('VIRTUAL:')
-    );
+    // Separate devices by type for dropdowns
+    const fishDevices = userDevices
+      .filter((d) => d.deviceType === 'fish')
+      .map((d) => ({
+        id: d.id,
+        name: d.deviceName,
+        mac: d.deviceMac,
+        status: d.status,
+        isVirtual: d.deviceMac.startsWith('VIRTUAL:'),
+      }));
+
+    const plantDevices = userDevices
+      .filter((d) => d.deviceType === 'plant')
+      .map((d) => ({
+        id: d.id,
+        name: d.deviceName,
+        mac: d.deviceMac,
+        status: d.status,
+        isVirtual: d.deviceMac.startsWith('VIRTUAL:'),
+      }));
+
+    // Find currently selected devices
+    const selectedFishDevice = config?.fishDeviceId
+      ? fishDevices.find((d) => d.id === config.fishDeviceId)
+      : null;
+    const selectedPlantDevice = config?.plantDeviceId
+      ? plantDevices.find((d) => d.id === config.plantDeviceId)
+      : null;
 
     return NextResponse.json({
-      config: config || null,
-      fishDevice: fishDevice
-        ? { id: fishDevice.id, name: fishDevice.deviceName, mac: fishDevice.deviceMac }
+      config: config
+        ? {
+            enabled: config.enabled,
+            fishEnabled: config.enabled && !!config.fishDeviceId,
+            plantEnabled: config.enabled && !!config.plantDeviceId,
+            dataSource: config.dataSource,
+            speedMultiplier: config.speedMultiplier,
+            fishDeviceId: config.fishDeviceId,
+            plantDeviceId: config.plantDeviceId,
+          }
         : null,
-      plantDevice: plantDevice
-        ? { id: plantDevice.id, name: plantDevice.deviceName, mac: plantDevice.deviceMac }
-        : null,
+      fishDevices,
+      plantDevices,
+      selectedFishDevice,
+      selectedPlantDevice,
     });
   } catch (error) {
     console.error('[Virtual Devices API] GET error:', error);
@@ -48,7 +77,7 @@ export async function GET() {
   }
 }
 
-// POST - Create or update virtual device configuration
+// POST - Create or update virtual device configuration with user-selected devices
 export async function POST(request: Request) {
   try {
     const session = await getSession();
@@ -57,7 +86,58 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { enabled, dataSource = 'training', speedMultiplier = 1 } = body;
+    const {
+      enabled = false,
+      fishDeviceId = null,
+      plantDeviceId = null,
+      dataSource = 'validation',
+      speedMultiplier = 1,
+    } = body;
+
+    // Validate that selected devices exist and belong to user
+    if (fishDeviceId) {
+      const [fishDevice] = await db
+        .select()
+        .from(devices)
+        .where(eq(devices.id, fishDeviceId))
+        .limit(1);
+
+      if (!fishDevice || fishDevice.userId !== session.userId) {
+        return NextResponse.json(
+          { error: 'Invalid fish device selection' },
+          { status: 400 }
+        );
+      }
+
+      if (fishDevice.deviceType !== 'fish') {
+        return NextResponse.json(
+          { error: 'Selected device is not a fish sensor' },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (plantDeviceId) {
+      const [plantDevice] = await db
+        .select()
+        .from(devices)
+        .where(eq(devices.id, plantDeviceId))
+        .limit(1);
+
+      if (!plantDevice || plantDevice.userId !== session.userId) {
+        return NextResponse.json(
+          { error: 'Invalid plant device selection' },
+          { status: 400 }
+        );
+      }
+
+      if (plantDevice.deviceType !== 'plant') {
+        return NextResponse.json(
+          { error: 'Selected device is not a plant sensor' },
+          { status: 400 }
+        );
+      }
+    }
 
     // Get existing config
     const [existingConfig] = await db
@@ -66,84 +146,35 @@ export async function POST(request: Request) {
       .where(eq(virtualDeviceConfig.userId, session.userId))
       .limit(1);
 
-    // Get or create virtual devices
-    let fishDeviceId: string | null = null;
-    let plantDeviceId: string | null = null;
-
+    // Update device statuses based on selection
     if (enabled) {
-      // Check for existing virtual fish device
-      const [existingFish] = await db
-        .select()
-        .from(devices)
-        .where(
-          and(
-            eq(devices.userId, session.userId),
-            eq(devices.deviceType, 'fish'),
-            // Use deviceMac starting with VIRTUAL:
-          )
-        );
-
-      const virtualFish = existingFish?.deviceMac?.startsWith('VIRTUAL:') ? existingFish : null;
-
-      if (!virtualFish) {
-        // Create virtual fish device
-        const fishApiKey = `vfish_${randomUUID().replace(/-/g, '').substring(0, 24)}`;
-        const [newFishDevice] = await db
-          .insert(devices)
-          .values({
-            userId: session.userId,
-            deviceName: 'Virtual Fish Sensor',
-            deviceMac: 'VIRTUAL:FISH:001',
-            deviceType: 'fish',
-            apiKey: fishApiKey,
-            status: 'online',
-          })
-          .returning();
-        fishDeviceId = newFishDevice.id;
-      } else {
-        fishDeviceId = virtualFish.id;
-        // Update status to online
+      if (fishDeviceId) {
         await db
           .update(devices)
           .set({ status: 'online', lastSeen: new Date() })
-          .where(eq(devices.id, virtualFish.id));
+          .where(eq(devices.id, fishDeviceId));
       }
-
-      // Check for existing virtual plant device
-      const [existingPlant] = await db
-        .select()
-        .from(devices)
-        .where(
-          and(
-            eq(devices.userId, session.userId),
-            eq(devices.deviceType, 'plant'),
-          )
-        );
-
-      const virtualPlant = existingPlant?.deviceMac?.startsWith('VIRTUAL:') ? existingPlant : null;
-
-      if (!virtualPlant) {
-        // Create virtual plant device
-        const plantApiKey = `vplant_${randomUUID().replace(/-/g, '').substring(0, 24)}`;
-        const [newPlantDevice] = await db
-          .insert(devices)
-          .values({
-            userId: session.userId,
-            deviceName: 'Virtual Plant Sensor',
-            deviceMac: 'VIRTUAL:PLANT:001',
-            deviceType: 'plant',
-            apiKey: plantApiKey,
-            status: 'online',
-          })
-          .returning();
-        plantDeviceId = newPlantDevice.id;
-      } else {
-        plantDeviceId = virtualPlant.id;
-        // Update status to online
+      if (plantDeviceId) {
         await db
           .update(devices)
           .set({ status: 'online', lastSeen: new Date() })
-          .where(eq(devices.id, virtualPlant.id));
+          .where(eq(devices.id, plantDeviceId));
+      }
+    }
+
+    // Set old devices to offline if they were previously selected but now changed
+    if (existingConfig) {
+      if (existingConfig.fishDeviceId && existingConfig.fishDeviceId !== fishDeviceId) {
+        await db
+          .update(devices)
+          .set({ status: 'offline' })
+          .where(eq(devices.id, existingConfig.fishDeviceId));
+      }
+      if (existingConfig.plantDeviceId && existingConfig.plantDeviceId !== plantDeviceId) {
+        await db
+          .update(devices)
+          .set({ status: 'offline' })
+          .where(eq(devices.id, existingConfig.plantDeviceId));
       }
     }
 
@@ -153,8 +184,8 @@ export async function POST(request: Request) {
         .update(virtualDeviceConfig)
         .set({
           enabled,
-          fishDeviceId: enabled ? fishDeviceId : existingConfig.fishDeviceId,
-          plantDeviceId: enabled ? plantDeviceId : existingConfig.plantDeviceId,
+          fishDeviceId,
+          plantDeviceId,
           dataSource,
           speedMultiplier,
           updatedAt: new Date(),
@@ -171,25 +202,30 @@ export async function POST(request: Request) {
       });
     }
 
-    // If disabling, set devices to offline
-    if (!enabled && existingConfig) {
-      if (existingConfig.fishDeviceId) {
+    // If disabling, set selected devices to offline
+    if (!enabled) {
+      if (fishDeviceId) {
         await db
           .update(devices)
           .set({ status: 'offline' })
-          .where(eq(devices.id, existingConfig.fishDeviceId));
+          .where(eq(devices.id, fishDeviceId));
       }
-      if (existingConfig.plantDeviceId) {
+      if (plantDeviceId) {
         await db
           .update(devices)
           .set({ status: 'offline' })
-          .where(eq(devices.id, existingConfig.plantDeviceId));
+          .where(eq(devices.id, plantDeviceId));
       }
     }
 
+    const enabledCount = (fishDeviceId ? 1 : 0) + (plantDeviceId ? 1 : 0);
+    const message = enabled
+      ? `Virtual streaming enabled for ${enabledCount} device(s)`
+      : 'Virtual streaming disabled';
+
     return NextResponse.json({
       success: true,
-      message: enabled ? 'Virtual devices enabled' : 'Virtual devices disabled',
+      message,
     });
   } catch (error) {
     console.error('[Virtual Devices API] POST error:', error);
@@ -197,7 +233,7 @@ export async function POST(request: Request) {
   }
 }
 
-// DELETE - Remove virtual devices and their data
+// DELETE - Clear virtual device configuration (doesn't delete devices)
 export async function DELETE() {
   try {
     const session = await getSession();
@@ -213,27 +249,29 @@ export async function DELETE() {
       .limit(1);
 
     if (config) {
+      // Set selected devices to offline
+      if (config.fishDeviceId) {
+        await db
+          .update(devices)
+          .set({ status: 'offline' })
+          .where(eq(devices.id, config.fishDeviceId));
+      }
+      if (config.plantDeviceId) {
+        await db
+          .update(devices)
+          .set({ status: 'offline' })
+          .where(eq(devices.id, config.plantDeviceId));
+      }
+
       // Delete config
       await db
         .delete(virtualDeviceConfig)
         .where(eq(virtualDeviceConfig.id, config.id));
     }
 
-    // Find and delete virtual devices
-    const userDevices = await db
-      .select()
-      .from(devices)
-      .where(eq(devices.userId, session.userId));
-
-    for (const device of userDevices) {
-      if (device.deviceMac.startsWith('VIRTUAL:')) {
-        await db.delete(devices).where(eq(devices.id, device.id));
-      }
-    }
-
     return NextResponse.json({
       success: true,
-      message: 'Virtual devices removed',
+      message: 'Virtual device configuration cleared',
     });
   } catch (error) {
     console.error('[Virtual Devices API] DELETE error:', error);
