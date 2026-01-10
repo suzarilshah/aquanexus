@@ -335,8 +335,12 @@ export default function FirmwareConfiguratorPage() {
   const [deviceType, setDeviceType] = useState<'fish' | 'plant' | 'general'>('fish');
   const [apiKey, setApiKey] = useState('');
   const [deviceMac, setDeviceMac] = useState('');
-  // Pre-defined server configuration for Vercel deployment
-  const serverHost = 'aquanexus.vercel.app';
+  // WiFi credentials for manual configuration
+  const [wifiSsid, setWifiSsid] = useState('');
+  const [wifiPassword, setWifiPassword] = useState('');
+  const [showWifiPassword, setShowWifiPassword] = useState(false);
+  // Server configuration
+  const serverHost = 'app.airail.uk';
   const serverPort = 443;
   const [sensorInterval, setSensorInterval] = useState(10000);
   const [useAbly, setUseAbly] = useState(true);
@@ -429,6 +433,8 @@ export default function FirmwareConfiguratorPage() {
       deviceType,
       apiKey: apiKey || undefined,
       deviceMac: deviceMac || undefined,
+      wifiSsid: wifiSsid || undefined,
+      wifiPassword: wifiPassword || undefined,
       serverHost,
       serverPort,
       useWebSocket: false,
@@ -445,6 +451,8 @@ export default function FirmwareConfiguratorPage() {
     deviceType,
     apiKey,
     deviceMac,
+    wifiSsid,
+    wifiPassword,
     serverHost,
     serverPort,
     useAbly,
@@ -827,36 +835,96 @@ export default function FirmwareConfiguratorPage() {
                     </SettingsSection>
                   </PremiumCard>
 
-                  {/* WiFi Setup Info */}
-                  <PremiumCard className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                        <Wifi className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="space-y-3">
-                        <h4 className="font-semibold text-blue-900">
-                          Smart WiFi Provisioning
-                        </h4>
-                        <p className="text-sm text-blue-700">
-                          No WiFi credentials stored in code! After flashing:
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {[
-                            { step: 1, text: `Connect to "${deviceName || 'AquaNexus'}-Setup"` },
-                            { step: 2, text: 'Password: aquanexus123' },
-                            { step: 3, text: 'Open 192.168.4.1 in browser' },
-                            { step: 4, text: 'Select your WiFi & done!' },
-                          ].map(({ step, text }) => (
-                            <div key={step} className="flex items-center gap-2 bg-blue-100/50 rounded-lg px-3 py-2">
-                              <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">
-                                {step}
-                              </span>
-                              <span className="text-xs text-blue-800">{text}</span>
-                            </div>
-                          ))}
+                  {/* WiFi Configuration */}
+                  <PremiumCard glow className="p-6">
+                    <SettingsSection
+                      title="WiFi Configuration"
+                      icon={Wifi}
+                      description="Enter your WiFi credentials for the device"
+                    >
+                      <div className="mt-4 space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="wifiSsid" className="flex items-center gap-2">
+                            <Wifi className="h-4 w-4 text-blue-500" />
+                            WiFi Network Name (SSID)
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                              Required
+                            </span>
+                          </Label>
+                          <Input
+                            id="wifiSsid"
+                            value={wifiSsid}
+                            onChange={(e) => setWifiSsid(e.target.value)}
+                            placeholder="Your WiFi network name"
+                            className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="wifiPassword" className="flex items-center gap-2">
+                            <Key className="h-4 w-4 text-blue-500" />
+                            WiFi Password
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                              Required
+                            </span>
+                          </Label>
+                          <div className="relative">
+                            <Input
+                              id="wifiPassword"
+                              type={showWifiPassword ? 'text' : 'password'}
+                              value={wifiPassword}
+                              onChange={(e) => setWifiPassword(e.target.value)}
+                              placeholder="Your WiFi password"
+                              className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowWifiPassword(!showWifiPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                              {showWifiPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* WiFi Status Indicator */}
+                        <div className={cn(
+                          "rounded-xl p-3 border",
+                          wifiSsid && wifiPassword
+                            ? "bg-emerald-50 border-emerald-200"
+                            : "bg-amber-50 border-amber-200"
+                        )}>
+                          <div className="flex items-center gap-2">
+                            {wifiSsid && wifiPassword ? (
+                              <>
+                                <Check className="h-4 w-4 text-emerald-600" />
+                                <span className="text-sm text-emerald-700 font-medium">
+                                  WiFi credentials configured
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                <span className="text-sm text-amber-700 font-medium">
+                                  Please enter WiFi credentials
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Security Note */}
+                        <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                          <div className="flex items-start gap-2">
+                            <Shield className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-blue-700">
+                              WiFi credentials are stored securely in the firmware flash memory.
+                              Ensure you&apos;re using a trusted network.
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </SettingsSection>
                   </PremiumCard>
 
                   {/* Connectivity Options */}

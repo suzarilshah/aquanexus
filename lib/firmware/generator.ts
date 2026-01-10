@@ -19,9 +19,12 @@ export interface FirmwareConfig {
   enableOTA: boolean;
   enableDeepSleep: boolean;
   deepSleepDuration: number;
-  // New fields for API connection
+  // API connection fields
   apiKey?: string;
   deviceMac?: string;
+  // WiFi credentials for manual configuration
+  wifiSsid?: string;
+  wifiPassword?: string;
 }
 
 export interface GeneratedFirmware {
@@ -32,15 +35,17 @@ export interface GeneratedFirmware {
 }
 
 // Collect unique libraries from all sensors
-function collectLibraries(assignments: PinAssignment[], useAbly: boolean): LibraryDependency[] {
+function collectLibraries(assignments: PinAssignment[], useAbly: boolean, hasManualWifi: boolean): LibraryDependency[] {
   const libraryMap = new Map<string, LibraryDependency>();
 
-  // Always include WiFiManager for provisioning
-  libraryMap.set('WiFiManager', {
-    name: 'WiFiManager',
-    include: '#include <WiFiManager.h>',
-    github: 'https://github.com/tzapu/WiFiManager',
-  });
+  // Only include WiFiManager if no manual WiFi credentials
+  if (!hasManualWifi) {
+    libraryMap.set('WiFiManager', {
+      name: 'WiFiManager',
+      include: '#include <WiFiManager.h>',
+      github: 'https://github.com/tzapu/WiFiManager',
+    });
+  }
 
   // Always include ArduinoJson
   libraryMap.set('ArduinoJson', {
@@ -254,8 +259,14 @@ function checkWarnings(assignments: PinAssignment[], board: BoardDefinition, con
 }
 
 export function generateFirmware(config: FirmwareConfig): GeneratedFirmware {
-  const libraries = collectLibraries(config.assignments, config.useAbly);
+  const hasManualWifi = !!(config.wifiSsid && config.wifiPassword);
+  const libraries = collectLibraries(config.assignments, config.useAbly, hasManualWifi);
   const warnings = checkWarnings(config.assignments, config.board, config);
+
+  // Add warning if no WiFi credentials provided
+  if (!hasManualWifi) {
+    warnings.push('No WiFi credentials provided - WiFiManager provisioning will be used');
+  }
 
   const includeStatements = libraries.map(lib => lib.include).join('\n');
   const variableDeclarations = generateVariableDeclarations(config.assignments);
@@ -275,9 +286,7 @@ export function generateFirmware(config: FirmwareConfig): GeneratedFirmware {
  * Type: ${config.deviceType}
  * Board: ${config.board.name}
  *
- * IMPORTANT: This firmware uses WiFiManager for provisioning.
- * After flashing, the device will create a WiFi hotspot named "AquaNexus-Setup".
- * Connect to this hotspot and configure your WiFi credentials.
+ * ${hasManualWifi ? 'WiFi Mode: Manual Configuration (credentials hardcoded)' : 'WiFi Mode: WiFiManager Provisioning (setup hotspot)'}
  *
  * Libraries Required:
 ${libraries.map(lib => ` *   - ${lib.name}${lib.github ? ` (${lib.github})` : ''}`).join('\n')}
@@ -297,20 +306,30 @@ ${includeStatements}
 ${config.deviceMac ? `#define DEVICE_MAC "${config.deviceMac}"` : '// MAC will be auto-detected'}
 ${config.apiKey ? `#define API_KEY "${config.apiKey}"` : '#define API_KEY ""  // Get this from your AquaNexus dashboard'}
 
+// WiFi Configuration
+${hasManualWifi ? `#define WIFI_SSID "${config.wifiSsid}"
+#define WIFI_PASSWORD "${config.wifiPassword}"
+#define USE_MANUAL_WIFI true` : '#define USE_MANUAL_WIFI false'}
+
 // Server Configuration
 #define SERVER_HOST "${config.serverHost}"
 #define SERVER_PORT ${config.serverPort}
 #define API_ENDPOINT "https://${config.serverHost}/api/telemetry"
+#define HEALTHCHECK_ENDPOINT "https://${config.serverHost}/api/telemetry"
 #define USE_HTTPS true
 
 // Timing Configuration
 #define SENSOR_INTERVAL ${config.sensorInterval}
 #define HEARTBEAT_INTERVAL 30000
+#define HEALTHCHECK_INTERVAL 60000  // Healthcheck every 60 seconds
+#define WIFI_RETRY_INTERVAL 5000
+#define MAX_WIFI_RETRIES 20
 
 // Feature Toggles
 #define USE_ABLY ${config.useAbly ? 'true' : 'false'}
 #define ENABLE_OTA ${config.enableOTA ? 'true' : 'false'}
 ${config.enableDeepSleep ? `#define ENABLE_DEEP_SLEEP true\n#define DEEP_SLEEP_DURATION ${config.deepSleepDuration}` : '#define ENABLE_DEEP_SLEEP false'}
+#define ENABLE_VERBOSE_LOGGING true
 
 // Built-in LED for status indication
 #define LED_PIN 2
@@ -329,7 +348,7 @@ float calculateHeight(float distance) {
 ${variableDeclarations}
 
 // ========== SYSTEM VARIABLES ==========
-WiFiManager wifiManager;
+${hasManualWifi ? '' : 'WiFiManager wifiManager;'}
 WiFiClientSecure secureClient;
 HTTPClient http;
 Preferences preferences;
@@ -342,12 +361,27 @@ const int ABLY_PORT = 1883;
 String ablyClientId;
 ` : ''}
 
+// Device identification
 String deviceMac;
 String apiKey;
-bool wifiConnected = false;
+String firmwareVersion = "2.1.0";
 
+// Connection state
+bool wifiConnected = false;
+int wifiReconnectCount = 0;
+int httpSuccessCount = 0;
+int httpFailCount = 0;
+unsigned long lastSuccessfulSend = 0;
+
+// Timing variables
 unsigned long lastSensorRead = 0;
 unsigned long lastHeartbeat = 0;
+unsigned long lastHealthcheck = 0;
+unsigned long bootTime = 0;
+
+// Error tracking
+String lastError = "";
+int consecutiveErrors = 0;
 
 // ========== HELPER FUNCTION FOR READINGS ==========
 void addReading(JsonArray& readings, const char* type, float value, const char* unit) {
@@ -359,16 +393,64 @@ void addReading(JsonArray& readings, const char* type, float value, const char* 
   }
 }
 
+// ========== LOGGING FUNCTIONS ==========
+void logInfo(const char* message) {
+  #if ENABLE_VERBOSE_LOGGING
+  Serial.print("[INFO] ");
+  Serial.println(message);
+  #endif
+}
+
+void logInfo(String message) {
+  logInfo(message.c_str());
+}
+
+void logError(const char* message) {
+  Serial.print("[ERROR] ");
+  Serial.println(message);
+  lastError = message;
+  consecutiveErrors++;
+}
+
+void logError(String message) {
+  logError(message.c_str());
+}
+
+void logWarning(const char* message) {
+  Serial.print("[WARN] ");
+  Serial.println(message);
+}
+
+void logWarning(String message) {
+  logWarning(message.c_str());
+}
+
+void logDebug(const char* component, const char* message) {
+  #if ENABLE_VERBOSE_LOGGING
+  Serial.print("[DEBUG][");
+  Serial.print(component);
+  Serial.print("] ");
+  Serial.println(message);
+  #endif
+}
+
+void logDebug(const char* component, String message) {
+  logDebug(component, message.c_str());
+}
+
 // ========== SETUP ==========
 void setup() {
   Serial.begin(115200);
   delay(1000);
 
+  bootTime = millis();
+
   Serial.println();
-  Serial.println("╔════════════════════════════════════════════╗");
-  Serial.println("║      AquaNexus ESP32 Firmware v2.0.0       ║");
-  Serial.println("║      Device: " DEVICE_NAME);
-  Serial.println("╚════════════════════════════════════════════╝");
+  Serial.println("╔════════════════════════════════════════════════════════╗");
+  Serial.println("║        AquaNexus ESP32 Firmware v" + firmwareVersion + "               ║");
+  Serial.println("║        Device: " DEVICE_NAME);
+  Serial.println("║        Type: " DEVICE_TYPE);
+  Serial.println("╚════════════════════════════════════════════════════════╝");
   Serial.println();
 
   // Initialize LED
@@ -378,47 +460,78 @@ void setup() {
   // Get device MAC address
   #ifdef DEVICE_MAC
   deviceMac = DEVICE_MAC;
+  logInfo("Using configured MAC: " + deviceMac);
   #else
   deviceMac = WiFi.macAddress();
+  logInfo("Auto-detected MAC: " + deviceMac);
   #endif
-  Serial.println("Device MAC: " + deviceMac);
 
   // Load API key
   #ifdef API_KEY
   apiKey = API_KEY;
   if (apiKey.length() > 0) {
-    Serial.println("API Key configured: " + apiKey.substring(0, 8) + "...");
+    logInfo("API Key configured: " + apiKey.substring(0, 8) + "...");
   } else {
-    Serial.println("WARNING: No API key configured!");
-    Serial.println("Get your API key from the AquaNexus dashboard.");
+    logWarning("No API key configured! Device registration required.");
   }
   #endif
 
-  // ========== WiFiManager Setup (Provisioning Mode) ==========
+  // ========== WiFi Connection ==========
+  ${hasManualWifi ? `
+  // Manual WiFi Configuration
+  logInfo("Connecting to WiFi: " WIFI_SSID);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  int retryCount = 0;
+  while (WiFi.status() != WL_CONNECTED && retryCount < MAX_WIFI_RETRIES) {
+    delay(WIFI_RETRY_INTERVAL);
+    Serial.print(".");
+    retryCount++;
+    logDebug("WIFI", "Connection attempt " + String(retryCount) + "/" + String(MAX_WIFI_RETRIES));
+  }
+  Serial.println();
+
+  if (WiFi.status() != WL_CONNECTED) {
+    logError("WiFi connection failed after " + String(MAX_WIFI_RETRIES) + " attempts");
+    logError("Check SSID and password configuration");
+    Serial.println("Restarting in 10 seconds...");
+    delay(10000);
+    ESP.restart();
+  }
+  ` : `
+  // WiFiManager Setup (Provisioning Mode)
   wifiManager.setConfigPortalTimeout(180);
   wifiManager.setAPCallback(configModeCallback);
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-  Serial.println("Connecting to WiFi...");
-  Serial.println("If this fails, a setup hotspot will be created.");
-  Serial.println();
+  logInfo("Connecting to WiFi via WiFiManager...");
+  logInfo("If this fails, a setup hotspot will be created.");
 
   if (!wifiManager.autoConnect("AquaNexus-Setup", "aquanexus123")) {
-    Serial.println("Failed to connect and hit timeout");
+    logError("WiFiManager failed to connect and hit timeout");
     Serial.println("Restarting in 3 seconds...");
     delay(3000);
     ESP.restart();
   }
+  `}
 
   // WiFi Connected
   wifiConnected = true;
   Serial.println();
+  Serial.println("════════════════════════════════════════════════════════");
   Serial.println("✓ WiFi connected successfully!");
+  Serial.println("  SSID: " + WiFi.SSID());
   Serial.println("  IP address: " + WiFi.localIP().toString());
+  Serial.println("  Gateway: " + WiFi.gatewayIP().toString());
+  Serial.println("  DNS: " + WiFi.dnsIP().toString());
   Serial.println("  Signal strength: " + String(WiFi.RSSI()) + " dBm");
+  Serial.println("  MAC Address: " + deviceMac);
+  Serial.println("════════════════════════════════════════════════════════");
 
   // Configure secure client for HTTPS
   secureClient.setInsecure(); // For testing - use proper certificates in production
+  logDebug("HTTPS", "Secure client configured (insecure mode for testing)");
 
   // Blink LED to indicate successful connection
   for (int i = 0; i < 3; i++) {
@@ -440,8 +553,11 @@ void setup() {
 
   Serial.println();
   Serial.println("✓ Setup complete! Starting main loop...");
-  Serial.println("════════════════════════════════════════════");
+  Serial.println("════════════════════════════════════════════════════════");
   Serial.println();
+
+  // Send initial healthcheck with full device info
+  sendHealthcheck();
 
   // Send initial heartbeat
   sendHeartbeat();
@@ -463,6 +579,7 @@ void loop() {
 
   // Read sensors at specified interval
   if (millis() - lastSensorRead >= SENSOR_INTERVAL) {
+    logDebug("LOOP", "Reading sensors...");
     readAllSensors();
     sendSensorData();
     lastSensorRead = millis();
@@ -472,6 +589,12 @@ void loop() {
   if (millis() - lastHeartbeat >= HEARTBEAT_INTERVAL) {
     sendHeartbeat();
     lastHeartbeat = millis();
+  }
+
+  // Send healthcheck with full device info
+  if (millis() - lastHealthcheck >= HEALTHCHECK_INTERVAL) {
+    sendHealthcheck();
+    lastHealthcheck = millis();
   }
 
   #if ENABLE_OTA
@@ -484,10 +607,16 @@ void loop() {
   }
   #endif
 
+  // Reset consecutive errors on successful operation
+  if (consecutiveErrors > 0 && httpSuccessCount > 0) {
+    logInfo("Connection recovered after " + String(consecutiveErrors) + " errors");
+    consecutiveErrors = 0;
+  }
+
   delay(10);
 }
 
-// ========== WiFiManager CALLBACKS ==========
+${hasManualWifi ? '' : `// ========== WiFiManager CALLBACKS ==========
 void configModeCallback(WiFiManager *myWiFiManager) {
   Serial.println();
   Serial.println("╔════════════════════════════════════════════╗");
@@ -506,8 +635,9 @@ void configModeCallback(WiFiManager *myWiFiManager) {
 }
 
 void saveConfigCallback() {
-  Serial.println("✓ WiFi configuration saved!");
+  logInfo("WiFi configuration saved!");
 }
+`}
 
 // ========== SENSOR INITIALIZATION ==========
 void initializeSensors() {
@@ -574,23 +704,42 @@ ${readingsArrayCode}
 }
 
 void sendViaHTTPS(String payload) {
+  logDebug("HTTP", "Starting HTTPS POST to " API_ENDPOINT);
+
   http.begin(secureClient, API_ENDPOINT);
   http.addHeader("Content-Type", "application/json");
   http.setTimeout(10000);
 
+  unsigned long startTime = millis();
   int httpCode = http.POST(payload);
+  unsigned long duration = millis() - startTime;
 
   if (httpCode == 200 || httpCode == 201) {
     String response = http.getString();
-    Serial.println("✓ Data sent via HTTPS");
-    Serial.println("Response: " + response);
+    httpSuccessCount++;
+    lastSuccessfulSend = millis();
+    consecutiveErrors = 0;
+    logInfo("✓ Data sent via HTTPS (HTTP " + String(httpCode) + ", " + String(duration) + "ms)");
+    logDebug("HTTP", "Response: " + response);
     blinkLED(1);
   } else if (httpCode > 0) {
     String response = http.getString();
-    Serial.println("✗ HTTP Error " + String(httpCode) + ": " + response);
+    httpFailCount++;
+    logError("HTTP Error " + String(httpCode) + ": " + response);
+    logDebug("HTTP", "Failed after " + String(duration) + "ms");
     blinkLED(3);
   } else {
-    Serial.println("✗ Connection failed: " + http.errorToString(httpCode));
+    httpFailCount++;
+    String errorMsg = http.errorToString(httpCode);
+    logError("Connection failed: " + errorMsg);
+    logDebug("HTTP", "Error code: " + String(httpCode));
+
+    // Additional diagnostics for connection failures
+    if (httpCode == -1) {
+      logDebug("HTTP", "Possible causes: DNS failure, server unreachable, or TLS handshake failed");
+    } else if (httpCode == -11) {
+      logDebug("HTTP", "Connection timed out - check network or server status");
+    }
     blinkLED(5);
   }
 
@@ -599,6 +748,7 @@ void sendViaHTTPS(String payload) {
 
 void sendHeartbeat() {
   if (apiKey.length() == 0) {
+    logDebug("HEARTBEAT", "Skipping - no API key configured");
     return;
   }
 
@@ -617,7 +767,7 @@ void sendHeartbeat() {
   if (mqtt.connected()) {
     String topic = "aquanexus/" + deviceMac + "/heartbeat";
     mqtt.publish(topic.c_str(), payload.c_str());
-    Serial.println("✓ Heartbeat sent via MQTT");
+    logInfo("✓ Heartbeat sent via MQTT");
     return;
   }
   ` : ''}
@@ -629,8 +779,110 @@ void sendHeartbeat() {
 
   int httpCode = http.POST(payload);
   if (httpCode == 200 || httpCode == 201) {
-    Serial.println("✓ Heartbeat sent");
+    logInfo("✓ Heartbeat sent");
+  } else {
+    logDebug("HEARTBEAT", "Failed with code: " + String(httpCode));
   }
+  http.end();
+}
+
+// ========== COMPREHENSIVE HEALTHCHECK ==========
+// Sends complete device information for dashboard monitoring
+void sendHealthcheck() {
+  if (apiKey.length() == 0) {
+    logDebug("HEALTHCHECK", "Skipping - no API key configured");
+    return;
+  }
+
+  logInfo("Sending healthcheck with device info...");
+
+  DynamicJsonDocument doc(2048);
+
+  // Basic identification
+  doc["apiKey"] = apiKey;
+  doc["deviceMac"] = deviceMac;
+  doc["readingType"] = "healthcheck";
+  doc["timestamp"] = getISOTimestamp();
+
+  // Device Information
+  JsonObject deviceInfo = doc.createNestedObject("deviceInfo");
+  deviceInfo["name"] = DEVICE_NAME;
+  deviceInfo["type"] = DEVICE_TYPE;
+  deviceInfo["mac"] = deviceMac;
+  deviceInfo["firmware"] = firmwareVersion;
+  deviceInfo["board"] = "${config.board.name}";
+  deviceInfo["chipId"] = String((uint32_t)ESP.getEfuseMac(), HEX);
+
+  // System Status
+  JsonObject systemStatus = doc.createNestedObject("systemStatus");
+  systemStatus["freeHeap"] = ESP.getFreeHeap();
+  systemStatus["heapSize"] = ESP.getHeapSize();
+  systemStatus["minFreeHeap"] = ESP.getMinFreeHeap();
+  systemStatus["uptime"] = (millis() - bootTime) / 1000;  // seconds
+  systemStatus["cpuFreq"] = ESP.getCpuFreqMHz();
+
+  // WiFi Status
+  JsonObject wifiStatus = doc.createNestedObject("wifiStatus");
+  wifiStatus["connected"] = (WiFi.status() == WL_CONNECTED);
+  wifiStatus["ssid"] = WiFi.SSID();
+  wifiStatus["rssi"] = WiFi.RSSI();
+  wifiStatus["ip"] = WiFi.localIP().toString();
+  wifiStatus["gateway"] = WiFi.gatewayIP().toString();
+  wifiStatus["dns"] = WiFi.dnsIP().toString();
+  wifiStatus["reconnectCount"] = wifiReconnectCount;
+
+  // Connection Statistics
+  JsonObject connStats = doc.createNestedObject("connectionStats");
+  connStats["httpSuccessCount"] = httpSuccessCount;
+  connStats["httpFailCount"] = httpFailCount;
+  connStats["consecutiveErrors"] = consecutiveErrors;
+  connStats["lastSuccessfulSend"] = lastSuccessfulSend > 0 ? (millis() - lastSuccessfulSend) / 1000 : -1;
+  connStats["lastError"] = lastError;
+
+  // Configuration
+  JsonObject config = doc.createNestedObject("config");
+  config["serverHost"] = SERVER_HOST;
+  config["serverPort"] = SERVER_PORT;
+  config["sensorInterval"] = SENSOR_INTERVAL;
+  config["useAbly"] = USE_ABLY;
+  config["enableOTA"] = ENABLE_OTA;
+  config["useManualWifi"] = USE_MANUAL_WIFI;
+
+  String payload;
+  serializeJson(doc, payload);
+
+  logDebug("HEALTHCHECK", "Payload size: " + String(payload.length()) + " bytes");
+
+  ${config.useAbly ? `
+  if (mqtt.connected()) {
+    String topic = "aquanexus/" + deviceMac + "/healthcheck";
+    if (mqtt.publish(topic.c_str(), payload.c_str())) {
+      logInfo("✓ Healthcheck sent via MQTT");
+      return;
+    }
+  }
+  ` : ''}
+
+  // Send via HTTPS
+  http.begin(secureClient, HEALTHCHECK_ENDPOINT);
+  http.addHeader("Content-Type", "application/json");
+  http.setTimeout(15000);  // Longer timeout for healthcheck
+
+  unsigned long startTime = millis();
+  int httpCode = http.POST(payload);
+  unsigned long duration = millis() - startTime;
+
+  if (httpCode == 200 || httpCode == 201) {
+    String response = http.getString();
+    logInfo("✓ Healthcheck sent successfully (HTTP " + String(httpCode) + ", " + String(duration) + "ms)");
+    logDebug("HEALTHCHECK", "Response: " + response);
+  } else if (httpCode > 0) {
+    String response = http.getString();
+    logError("Healthcheck failed (HTTP " + String(httpCode) + "): " + response);
+  } else {
+    logError("Healthcheck connection failed: " + http.errorToString(httpCode));
+  }
+
   http.end();
 }
 
@@ -653,11 +905,42 @@ void blinkLED(int times) {
 // ========== WIFI RECONNECTION ==========
 void handleWiFiReconnection() {
   static unsigned long lastReconnectAttempt = 0;
+  static int localReconnectAttempts = 0;
+
+  wifiConnected = false;
 
   if (millis() - lastReconnectAttempt > 10000) {
-    Serial.println("WiFi disconnected. Attempting reconnection...");
+    localReconnectAttempts++;
+    wifiReconnectCount++;
+
+    logWarning("WiFi disconnected. Attempting reconnection... (attempt " + String(localReconnectAttempts) + ")");
+    logDebug("WIFI", "Total reconnect count: " + String(wifiReconnectCount));
+
+    WiFi.disconnect();
+    delay(100);
+
+    ${hasManualWifi ? `
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    ` : `
     WiFi.reconnect();
+    `}
+
     lastReconnectAttempt = millis();
+
+    // If too many failures, restart the device
+    if (localReconnectAttempts > 30) {
+      logError("WiFi reconnection failed after 30 attempts. Restarting...");
+      delay(1000);
+      ESP.restart();
+    }
+  }
+
+  // Check if reconnected
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiConnected = true;
+    localReconnectAttempts = 0;
+    logInfo("WiFi reconnected! IP: " + WiFi.localIP().toString());
+    sendHealthcheck();  // Send healthcheck after reconnection
   }
 }
 

@@ -759,28 +759,43 @@ export function BoardVisualizer({
           </div>
           <div className="p-4">
             {selectedPin ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2">
-                    <span className="text-xs text-gray-500">GPIO</span>
-                    <span className="font-mono text-sm font-bold text-gray-900">
-                      {selectedPin.gpio !== null ? selectedPin.gpio : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2">
-                    <span className="text-xs text-gray-500">Name</span>
-                    <span className="font-mono text-sm font-bold text-gray-900">{selectedPin.name}</span>
-                  </div>
-                  <span className={cn(
-                    'text-xs font-semibold px-2 py-1 rounded-lg ml-auto',
-                    getPinTypeColor(selectedPin)
-                  )}>
-                    {getPinTypeLabel(selectedPin)}
+              <div className="space-y-2">
+                {/* Pin Type Badge */}
+                <span className={cn(
+                  'inline-block text-xs font-semibold px-2 py-1 rounded-lg',
+                  getPinTypeColor(selectedPin)
+                )}>
+                  {getPinTypeLabel(selectedPin)}
+                </span>
+                {/* GPIO */}
+                <div className="flex items-center justify-between bg-gray-100 rounded-lg px-3 py-2">
+                  <span className="text-xs text-gray-500">GPIO</span>
+                  <span className="font-mono text-sm font-bold text-gray-900">
+                    {selectedPin.gpio !== null ? selectedPin.gpio : 'N/A'}
                   </span>
                 </div>
+                {/* Name */}
+                <div className="flex items-center justify-between bg-gray-100 rounded-lg px-3 py-2">
+                  <span className="text-xs text-gray-500">Name</span>
+                  <span className="font-mono text-sm font-bold text-gray-900">{selectedPin.name}</span>
+                </div>
+                {/* Capabilities */}
+                {selectedPin.capabilities.length > 0 && (
+                  <div className="bg-gray-100 rounded-lg px-3 py-2">
+                    <span className="text-xs text-gray-500 block mb-1">Capabilities</span>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedPin.capabilities.filter(c => c !== 'GPIO').slice(0, 4).map((cap) => (
+                        <span key={cap} className="text-[10px] bg-white px-1.5 py-0.5 rounded text-gray-600 font-medium">
+                          {cap}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Strapping Warning */}
                 {selectedPin.strapping && (
                   <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-lg text-xs">
-                    <AlertTriangle className="w-3 h-3" />
+                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
                     <span className="font-medium">Strapping Pin - affects boot</span>
                   </div>
                 )}
