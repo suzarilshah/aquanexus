@@ -1,12 +1,13 @@
 'use client';
 
 import { Suspense, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlantSensorCards } from '@/components/plants/sensor-cards';
 import { PlantCharts, EnvironmentRadar, GrowthProgressRing } from '@/components/plants/charts';
 import { RealTimeIndicator } from '@/components/dashboard/realtime-indicator';
 import { DeviceSelector } from '@/components/dashboard/device-selector';
+import { PeriodSelector, TimePeriod, getPeriodLabel } from '@/components/dashboard/period-selector';
 import { Sparkline } from '@/components/charts/sparkline';
 import {
   Leaf,
@@ -56,6 +57,7 @@ interface PlantDashboardClientProps {
   allDevices: Device[];
   latestReading: Reading;
   selectedDeviceId: string | null;
+  selectedPeriod: TimePeriod;
 }
 
 // Calculate statistics from readings
@@ -109,15 +111,19 @@ export function PlantDashboardClient({
   allDevices,
   latestReading,
   selectedDeviceId,
+  selectedPeriod,
 }: PlantDashboardClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleDeviceSelect = (deviceId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
     if (deviceId) {
-      router.push(`/dashboard/plants?device=${deviceId}`);
+      params.set('device', deviceId);
     } else {
-      router.push('/dashboard/plants');
+      params.delete('device');
     }
+    router.push(`/dashboard/plants?${params.toString()}`);
   };
 
   const isVirtualDevice = device?.deviceMac?.startsWith('VIRTUAL:');
@@ -148,7 +154,8 @@ export function PlantDashboardClient({
             Real-time monitoring of your growing environment
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <PeriodSelector selectedPeriod={selectedPeriod} />
           {allDevices.length > 0 && (
             <DeviceSelector
               devices={allDevices.map((d) => ({
@@ -259,7 +266,7 @@ export function PlantDashboardClient({
             {/* Reading Count */}
             <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-200 p-4 shadow-sm">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-blue-600">24h Readings</span>
+                <span className="text-xs font-medium text-blue-600">{getPeriodLabel(selectedPeriod).replace('Last ', '')} Readings</span>
                 <BarChart3 className="h-4 w-4 text-blue-500" />
               </div>
               <div className="flex items-baseline gap-2">
@@ -283,7 +290,7 @@ export function PlantDashboardClient({
             {/* Growth Rate */}
             <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 p-4 shadow-sm">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-emerald-600">24h Growth</span>
+                <span className="text-xs font-medium text-emerald-600">{getPeriodLabel(selectedPeriod).replace('Last ', '')} Growth</span>
                 <TrendingUp className="h-4 w-4 text-emerald-500" />
               </div>
               <div className="flex items-baseline gap-2">
@@ -406,12 +413,12 @@ export function PlantDashboardClient({
               </CardContent>
             </Card>
 
-            {/* 24h Statistics */}
+            {/* Period Statistics */}
             <Card className="shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-blue-500" />
-                  24h Statistics
+                  {getPeriodLabel(selectedPeriod).replace('Last ', '')} Statistics
                 </CardTitle>
                 <CardDescription>Min / Max / Average</CardDescription>
               </CardHeader>
@@ -555,7 +562,7 @@ export function PlantDashboardClient({
                   <Thermometer className="h-5 w-5 text-orange-500" />
                   Temperature History
                 </CardTitle>
-                <CardDescription>Last 24 hours • Optimal: 18-32°C</CardDescription>
+                <CardDescription>{getPeriodLabel(selectedPeriod)} • Optimal: 18-32°C</CardDescription>
               </CardHeader>
               <CardContent>
                 <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100 rounded" />}>
@@ -571,7 +578,7 @@ export function PlantDashboardClient({
                   <Droplets className="h-5 w-5 text-cyan-500" />
                   Humidity History
                 </CardTitle>
-                <CardDescription>Last 24 hours • Optimal: 40-80%</CardDescription>
+                <CardDescription>{getPeriodLabel(selectedPeriod)} • Optimal: 40-80%</CardDescription>
               </CardHeader>
               <CardContent>
                 <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100 rounded" />}>

@@ -8,8 +8,9 @@ import { PlantSensorCards } from '@/components/plants/sensor-cards';
 import { PlantCharts } from '@/components/plants/charts';
 import { RealTimeIndicator } from '@/components/dashboard/realtime-indicator';
 import { PlantDashboardClient } from './client';
+import { TimePeriod, getPeriodMilliseconds, getPeriodReadingLimit } from '@/components/dashboard/period-selector';
 
-async function getPlantData(userId: string, selectedDeviceId?: string) {
+async function getPlantData(userId: string, selectedDeviceId?: string, period: TimePeriod = '1d') {
   // Get all plant devices
   const plantDevices = await db
     .select()
@@ -30,7 +31,10 @@ async function getPlantData(userId: string, selectedDeviceId?: string) {
     ? plantDevices.find((d) => d.id === selectedDeviceId) || plantDevices[0]
     : plantDevices[0];
 
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  // Calculate time range based on period
+  const periodMs = getPeriodMilliseconds(period);
+  const cutoffDate = new Date(Date.now() - periodMs);
+  const readingLimit = getPeriodReadingLimit(period);
 
   // Get recent readings
   const readings = await db
@@ -39,11 +43,11 @@ async function getPlantData(userId: string, selectedDeviceId?: string) {
     .where(
       and(
         eq(plantReadings.deviceId, device.id),
-        gte(plantReadings.timestamp, twentyFourHoursAgo)
+        gte(plantReadings.timestamp, cutoffDate)
       )
     )
     .orderBy(desc(plantReadings.timestamp))
-    .limit(100);
+    .limit(readingLimit);
 
   // Get active alerts
   const activeAlerts = await db
@@ -75,7 +79,7 @@ async function getPlantData(userId: string, selectedDeviceId?: string) {
 export default async function PlantEnvironmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ device?: string }>;
+  searchParams: Promise<{ device?: string; period?: string }>;
 }) {
   const session = await getSession();
 
@@ -84,9 +88,12 @@ export default async function PlantEnvironmentPage({
   }
 
   const params = await searchParams;
+  const period = (params.period as TimePeriod) || '1d';
+
   const { device, readings, alerts: activeAlerts, allDevices } = await getPlantData(
     session.userId,
-    params.device
+    params.device,
+    period
   );
 
   // Get latest reading for current values
@@ -105,6 +112,7 @@ export default async function PlantEnvironmentPage({
       allDevices={allDevices}
       latestReading={latestReading}
       selectedDeviceId={params.device || null}
+      selectedPeriod={period}
     />
   );
 }

@@ -1,12 +1,13 @@
 'use client';
 
 import { Suspense, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FishSensorCards } from '@/components/fish/sensor-cards';
 import { FishCharts, WaterQualityRadar } from '@/components/fish/charts';
 import { RealTimeIndicator } from '@/components/dashboard/realtime-indicator';
 import { DeviceSelector } from '@/components/dashboard/device-selector';
+import { PeriodSelector, PeriodInfo, TimePeriod, getPeriodLabel } from '@/components/dashboard/period-selector';
 import { RadialGauge } from '@/components/charts/radial-gauge';
 import { Fish, Radio, Droplets, Thermometer, Activity, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Clock, BarChart3 } from 'lucide-react';
 
@@ -40,6 +41,7 @@ interface FishDashboardClientProps {
   allDevices: Device[];
   latestReading: Reading;
   selectedDeviceId: string | null;
+  selectedPeriod: TimePeriod;
 }
 
 // Calculate statistics from readings
@@ -69,15 +71,19 @@ export function FishDashboardClient({
   allDevices,
   latestReading,
   selectedDeviceId,
+  selectedPeriod,
 }: FishDashboardClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleDeviceSelect = (deviceId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
     if (deviceId) {
-      router.push(`/dashboard/fish?device=${deviceId}`);
+      params.set('device', deviceId);
     } else {
-      router.push('/dashboard/fish');
+      params.delete('device');
     }
+    router.push(`/dashboard/fish?${params.toString()}`);
   };
 
   const isVirtualDevice = device?.deviceMac?.startsWith('VIRTUAL:');
@@ -139,7 +145,8 @@ export function FishDashboardClient({
             Real-time water quality monitoring for your aquatic environment
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <PeriodSelector selectedPeriod={selectedPeriod} />
           {allDevices.length > 0 && (
             <DeviceSelector
               devices={allDevices.map((d) => ({
@@ -273,7 +280,7 @@ export function FishDashboardClient({
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-gray-500">Readings (24h)</p>
+                    <p className="text-xs font-medium text-gray-500">Readings ({getPeriodLabel(selectedPeriod).replace('Last ', '')})</p>
                     <p className="text-3xl font-bold text-gray-900">{readings.length}</p>
                     <p className="text-xs text-gray-400">data points</p>
                   </div>
@@ -396,12 +403,12 @@ export function FishDashboardClient({
               </CardContent>
             </Card>
 
-            {/* 24h Statistics */}
+            {/* Period Statistics */}
             <Card className="shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-blue-500" />
-                  24h Statistics
+                  {getPeriodLabel(selectedPeriod).replace('Last ', '')} Statistics
                 </CardTitle>
                 <CardDescription>Min/Max/Avg values</CardDescription>
               </CardHeader>
@@ -447,7 +454,7 @@ export function FishDashboardClient({
                 <Thermometer className="h-5 w-5 text-cyan-500" />
                 Temperature & pH Overview
               </CardTitle>
-              <CardDescription>Combined metrics over the last 24 hours</CardDescription>
+              <CardDescription>Combined metrics over {getPeriodLabel(selectedPeriod).toLowerCase()}</CardDescription>
             </CardHeader>
             <CardContent>
               <Suspense fallback={<div className="h-72 animate-pulse bg-gray-100 rounded" />}>

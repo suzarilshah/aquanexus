@@ -8,8 +8,9 @@ import { FishSensorCards } from '@/components/fish/sensor-cards';
 import { FishCharts } from '@/components/fish/charts';
 import { RealTimeIndicator } from '@/components/dashboard/realtime-indicator';
 import { FishDashboardClient } from './client';
+import { TimePeriod, getPeriodMilliseconds, getPeriodReadingLimit } from '@/components/dashboard/period-selector';
 
-async function getFishData(userId: string, selectedDeviceId?: string) {
+async function getFishData(userId: string, selectedDeviceId?: string, period: TimePeriod = '1d') {
   // Get all fish devices
   const fishDevices = await db
     .select()
@@ -30,7 +31,10 @@ async function getFishData(userId: string, selectedDeviceId?: string) {
     ? fishDevices.find((d) => d.id === selectedDeviceId) || fishDevices[0]
     : fishDevices[0];
 
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  // Calculate time range based on period
+  const periodMs = getPeriodMilliseconds(period);
+  const cutoffDate = new Date(Date.now() - periodMs);
+  const readingLimit = getPeriodReadingLimit(period);
 
   // Get recent readings
   const readings = await db
@@ -39,11 +43,11 @@ async function getFishData(userId: string, selectedDeviceId?: string) {
     .where(
       and(
         eq(fishReadings.deviceId, device.id),
-        gte(fishReadings.timestamp, twentyFourHoursAgo)
+        gte(fishReadings.timestamp, cutoffDate)
       )
     )
     .orderBy(desc(fishReadings.timestamp))
-    .limit(100);
+    .limit(readingLimit);
 
   // Get active alerts
   const activeAlerts = await db
@@ -76,7 +80,7 @@ async function getFishData(userId: string, selectedDeviceId?: string) {
 export default async function FishEnvironmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ device?: string }>;
+  searchParams: Promise<{ device?: string; period?: string }>;
 }) {
   const session = await getSession();
 
@@ -85,9 +89,12 @@ export default async function FishEnvironmentPage({
   }
 
   const params = await searchParams;
+  const period = (params.period as TimePeriod) || '1d';
+
   const { device, readings, alerts: activeAlerts, allDevices } = await getFishData(
     session.userId,
-    params.device
+    params.device,
+    period
   );
 
   // Get latest reading for current values
@@ -107,6 +114,7 @@ export default async function FishEnvironmentPage({
       allDevices={allDevices}
       latestReading={latestReading}
       selectedDeviceId={params.device || null}
+      selectedPeriod={period}
     />
   );
 }
