@@ -6,7 +6,6 @@ import type { BoardDefinition, PinDefinition, PinCapability } from '@/data/board
 import type { SensorDefinition } from '@/data/sensors';
 import { SENSOR_CATEGORIES, getSensorsByCategory, getAquaponicsSensors, type SensorCategory } from '@/data/sensors';
 import * as Popover from '@radix-ui/react-popover';
-import * as Tabs from '@radix-ui/react-tabs';
 import {
   Thermometer,
   Droplets,
@@ -405,10 +404,9 @@ export function BoardVisualizer({
   };
 
   return (
-    <div className={cn('grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6', className)}>
-      {/* Left: Interactive Pinout - inspired by pinouts.vercel.app */}
-      <div>
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+    <div className={cn('space-y-6', className)}>
+      {/* Main: Interactive Pinout - Full Width */}
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
@@ -678,87 +676,70 @@ export function BoardVisualizer({
               Use pin categories
             </span>
           </div>
-        </div>
       </div>
 
-      {/* Right: Board Info Panel - Premium Design */}
-      <div className="space-y-4">
-        {/* Board Header Card - Premium Style */}
+      {/* Bottom: Board Info Panel - Horizontal Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Board Header Card */}
         <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-          {/* Board Identity Header */}
-          <div className="px-5 py-5 border-b border-gray-100">
+          <div className="px-5 py-4 border-b border-gray-100">
             <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 flex-shrink-0">
-                <Cpu className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 flex-shrink-0">
+                <Cpu className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold text-gray-900 tracking-tight">{board.name}</h2>
+                <h2 className="text-base font-bold text-gray-900 tracking-tight">{board.name}</h2>
                 <p className="text-xs text-gray-500 mt-0.5">{board.microcontroller}</p>
-                <button
-                  onClick={() => setShowBoardInfo(!showBoardInfo)}
-                  className="mt-2 text-xs font-medium text-cyan-600 hover:text-cyan-700 flex items-center gap-1 transition-colors"
-                >
-                  {showBoardInfo ? 'Hide specifications' : 'View specifications'}
-                  {showBoardInfo ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                </button>
+                <div className="flex items-center gap-3 mt-2 text-xs">
+                  <span className="flex items-center gap-1 text-gray-500">
+                    <Zap className="w-3 h-3 text-amber-500" />
+                    {board.clockSpeed}
+                  </span>
+                  <span className="flex items-center gap-1 text-gray-500">
+                    <Activity className="w-3 h-3 text-emerald-500" />
+                    {board.voltage}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Quick Stats Row */}
-          <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1 text-gray-500">
-                <Zap className="w-3 h-3 text-amber-500" />
-                {board.clockSpeed}
-              </span>
-              <span className="flex items-center gap-1 text-gray-500">
-                <Activity className="w-3 h-3 text-emerald-500" />
-                {board.voltage}
-              </span>
-            </div>
+          <div className="px-5 py-3 bg-gray-50 flex items-center justify-between">
+            <button
+              onClick={() => setShowBoardInfo(!showBoardInfo)}
+              className="text-xs font-medium text-cyan-600 hover:text-cyan-700 flex items-center gap-1 transition-colors"
+            >
+              {showBoardInfo ? 'Hide specs' : 'View specs'}
+              {showBoardInfo ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
               Ready
             </span>
           </div>
+        </div>
 
-          {/* Pin Categories - Compact Grid */}
-          <div className="px-5 py-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pin Categories</span>
-              <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{pinCategories.length} types</span>
-            </div>
-
-            <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+        {/* Pin Categories Card */}
+        <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pin Categories</span>
+            <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{pinCategories.length} types</span>
+          </div>
+          <div className="p-3">
+            <div className="flex flex-wrap gap-2">
               {pinCategories.map((category) => (
                 <button
                   key={category.id}
                   onClick={() => setHighlightedCategory(highlightedCategory === category.id ? null : category.id)}
                   className={cn(
-                    'flex items-center justify-between w-full px-3 py-2 rounded-xl border-2 transition-all text-left group',
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all text-sm',
                     highlightedCategory === category.id
-                      ? `${category.bgColor} border-current ${category.color} shadow-sm`
-                      : 'bg-white border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                      ? `${category.bgColor} border-current ${category.color}`
+                      : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
                   )}
                 >
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      'w-6 h-6 rounded-lg flex items-center justify-center transition-colors flex-shrink-0',
-                      highlightedCategory === category.id
-                        ? category.bgColor
-                        : 'bg-gray-100 group-hover:bg-gray-200'
-                    )}>
-                      <span className={category.color}>{category.icon}</span>
-                    </div>
-                    <span className={cn(
-                      'text-sm font-medium truncate',
-                      highlightedCategory === category.id ? category.color : 'text-gray-700'
-                    )}>
-                      {category.name}
-                    </span>
-                  </div>
+                  <span className={category.color}>{category.icon}</span>
+                  <span className="font-medium">{category.name}</span>
                   <span className={cn(
-                    'text-sm font-bold ml-2 flex-shrink-0',
+                    'text-xs font-bold',
                     highlightedCategory === category.id ? category.color : 'text-gray-400'
                   )}>
                     {category.count}
@@ -769,104 +750,109 @@ export function BoardVisualizer({
           </div>
         </div>
 
-        {/* Selected Pin Details Card - Enhanced */}
-        {selectedPin && (
-          <div className="bg-gradient-to-br from-white to-cyan-50/30 rounded-2xl border border-cyan-200 overflow-hidden shadow-sm">
-            <div className="px-5 py-4 border-b border-cyan-100 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-cyan-100 flex items-center justify-center">
-                  <Info className="w-3.5 h-3.5 text-cyan-600" />
-                </div>
-                Pin Details
-              </h3>
-              <span className={cn(
-                'text-xs font-semibold px-2.5 py-1 rounded-lg',
-                getPinTypeColor(selectedPin)
-              )}>
-                {getPinTypeLabel(selectedPin)}
-              </span>
-            </div>
-
-            <div className="px-5 py-4 space-y-4">
-              <div className="flex items-center gap-4 bg-white/60 rounded-xl p-3 border border-gray-100">
-                <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider">GPIO</div>
-                  <div className="font-mono text-lg font-bold text-gray-900">
-                    {selectedPin.gpio !== null ? selectedPin.gpio : 'N/A'}
-                  </div>
-                </div>
-                <div className="h-8 w-px bg-gray-200" />
-                <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider">Name</div>
-                  <div className="font-mono text-lg font-bold text-gray-900">{selectedPin.name}</div>
-                </div>
-              </div>
-
-              {selectedPin.aliases.length > 0 && (
-                <div>
-                  <div className="text-xs font-medium text-gray-600 mb-2">Alternative Names</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedPin.aliases.map((alias) => (
-                      <span key={alias} className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-lg font-mono border border-gray-200">
-                        {alias}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedPin.strapping && (
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-4 py-3">
-                  <div className="flex items-center gap-2 text-amber-700">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span className="text-sm font-semibold">Strapping Pin</span>
-                  </div>
-                  <p className="text-xs text-amber-600 mt-1">
-                    This pin affects boot behavior. Use with caution.
-                  </p>
-                </div>
-              )}
-            </div>
+        {/* Selected Pin / Assignments Card */}
+        <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              {selectedPin ? 'Selected Pin' : 'Assignments'}
+            </h3>
           </div>
-        )}
-
-        {/* Board Specifications Card (collapsible) - Premium */}
-        {showBoardInfo && (
-          <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-                  <Cpu className="w-3.5 h-3.5 text-white" />
+          <div className="p-4">
+            {selectedPin ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2">
+                    <span className="text-xs text-gray-500">GPIO</span>
+                    <span className="font-mono text-sm font-bold text-gray-900">
+                      {selectedPin.gpio !== null ? selectedPin.gpio : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2">
+                    <span className="text-xs text-gray-500">Name</span>
+                    <span className="font-mono text-sm font-bold text-gray-900">{selectedPin.name}</span>
+                  </div>
+                  <span className={cn(
+                    'text-xs font-semibold px-2 py-1 rounded-lg ml-auto',
+                    getPinTypeColor(selectedPin)
+                  )}>
+                    {getPinTypeLabel(selectedPin)}
+                  </span>
                 </div>
-                Specifications
-              </h3>
-            </div>
-            <div className="px-5 py-4 space-y-4">
-              <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">{board.description}</p>
-
-              {/* Specs Grid - Compact */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-2.5 border border-blue-100">
-                  <div className="text-[9px] text-blue-600 uppercase tracking-wider font-semibold">Clock</div>
-                  <div className="text-sm font-bold text-blue-900 mt-0.5 truncate">{board.clockSpeed}</div>
-                </div>
-                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-lg p-2.5 border border-amber-100">
-                  <div className="text-[9px] text-amber-600 uppercase tracking-wider font-semibold">Voltage</div>
-                  <div className="text-sm font-bold text-amber-900 mt-0.5 truncate">{board.voltage}</div>
-                </div>
-                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-2.5 border border-emerald-100">
-                  <div className="text-[9px] text-emerald-600 uppercase tracking-wider font-semibold">Flash</div>
-                  <div className="text-sm font-bold text-emerald-900 mt-0.5 truncate">{board.flashSize}</div>
-                </div>
-                <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-2.5 border border-purple-100">
-                  <div className="text-[9px] text-purple-600 uppercase tracking-wider font-semibold">RAM</div>
-                  <div className="text-sm font-bold text-purple-900 mt-0.5 truncate">{board.ram}</div>
-                </div>
+                {selectedPin.strapping && (
+                  <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-lg text-xs">
+                    <AlertTriangle className="w-3 h-3" />
+                    <span className="font-medium">Strapping Pin - affects boot</span>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : assignments.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {assignments.slice(0, 6).map((a) => {
+                  const SensorIcon = ICONS[a.sensor.icon] || Info;
+                  return (
+                    <div
+                      key={a.pinId}
+                      className="flex items-center gap-2 bg-gray-100 rounded-lg px-2.5 py-1.5"
+                    >
+                      <SensorIcon className="w-3.5 h-3.5" style={{ color: a.sensor.color }} />
+                      <span className="text-xs font-medium text-gray-700">{a.sensor.name}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">GPIO{a.gpio}</span>
+                    </div>
+                  );
+                })}
+                {assignments.length > 6 && (
+                  <span className="text-xs text-gray-400 self-center">+{assignments.length - 6} more</span>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-2">
+                Click on GPIO pins to assign sensors
+              </p>
+            )}
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Board Specifications (collapsible) */}
+      {showBoardInfo && (
+        <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="px-5 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+                <Cpu className="w-3.5 h-3.5 text-white" />
+              </div>
+              Specifications
+            </h3>
+            <button
+              onClick={() => setShowBoardInfo(false)}
+              className="text-gray-400 hover:text-gray-600 p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="p-5">
+            <p className="text-sm text-gray-600 leading-relaxed mb-4">{board.description}</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-3 border border-blue-100">
+                <div className="text-[10px] text-blue-600 uppercase tracking-wider font-semibold">Clock Speed</div>
+                <div className="text-sm font-bold text-blue-900 mt-1">{board.clockSpeed}</div>
+              </div>
+              <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-lg p-3 border border-amber-100">
+                <div className="text-[10px] text-amber-600 uppercase tracking-wider font-semibold">Voltage</div>
+                <div className="text-sm font-bold text-amber-900 mt-1">{board.voltage}</div>
+              </div>
+              <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-3 border border-emerald-100">
+                <div className="text-[10px] text-emerald-600 uppercase tracking-wider font-semibold">Flash Memory</div>
+                <div className="text-sm font-bold text-emerald-900 mt-1">{board.flashSize}</div>
+              </div>
+              <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-3 border border-purple-100">
+                <div className="text-[10px] text-purple-600 uppercase tracking-wider font-semibold">RAM</div>
+                <div className="text-sm font-bold text-purple-900 mt-1">{board.ram}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

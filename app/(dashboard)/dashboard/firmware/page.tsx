@@ -6,11 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BoardVisualizer, type PinAssignment } from '@/components/onboarding/BoardVisualizer';
-import { BreadboardView } from '@/components/onboarding/BreadboardView';
 import { WebSerialFlasher } from '@/components/onboarding/WebSerialFlasher';
 import { generateFirmware, type FirmwareConfig } from '@/lib/firmware/generator';
 import { BOARD_LIST, getBoard } from '@/data/boards';
-import * as Tabs from '@radix-ui/react-tabs';
 import * as Select from '@radix-ui/react-select';
 import * as Switch from '@radix-ui/react-switch';
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -597,66 +595,28 @@ export default function FirmwareConfiguratorPage() {
 
               {/* Step 2: Pin Configuration */}
               {currentStep === 'pins' && board && (
-                <Tabs.Root defaultValue="board" className="space-y-4">
-                  <Tabs.List className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
-                    <Tabs.Trigger
-                      value="board"
-                      className="px-4 py-2 text-sm font-medium rounded-lg transition-all data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-cyan-600"
-                    >
-                      Board View
-                    </Tabs.Trigger>
-                    <Tabs.Trigger
-                      value="breadboard"
-                      className="px-4 py-2 text-sm font-medium rounded-lg transition-all data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-cyan-600"
-                    >
-                      Wiring Guide
-                    </Tabs.Trigger>
-                  </Tabs.List>
-
-                  <Tabs.Content value="board">
-                    <PremiumCard glow className="p-6">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center">
-                          <CircuitBoard className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <h2 className="text-lg font-semibold text-gray-900">
-                            {board.name} Pin Configuration
-                          </h2>
-                          <p className="text-sm text-gray-500">
-                            Click GPIO pins to assign sensors
-                          </p>
-                        </div>
-                      </div>
-                      <BoardVisualizer
-                        board={board}
-                        assignments={assignments}
-                        onAssign={handleAssign}
-                        onUnassign={handleUnassign}
-                        deviceType={deviceType === 'general' ? 'general' : deviceType}
-                      />
-                    </PremiumCard>
-                  </Tabs.Content>
-
-                  <Tabs.Content value="breadboard">
-                    <PremiumCard glow className="p-6">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
-                          <Waves className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <h2 className="text-lg font-semibold text-gray-900">
-                            Breadboard Wiring Diagram
-                          </h2>
-                          <p className="text-sm text-gray-500">
-                            Visual guide for connecting your sensors
-                          </p>
-                        </div>
-                      </div>
-                      <BreadboardView board={board} assignments={assignments} />
-                    </PremiumCard>
-                  </Tabs.Content>
-                </Tabs.Root>
+                <PremiumCard glow className="p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center">
+                      <CircuitBoard className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        {board.name} Pin Configuration
+                      </h2>
+                      <p className="text-sm text-gray-500">
+                        Click GPIO pins to assign sensors
+                      </p>
+                    </div>
+                  </div>
+                  <BoardVisualizer
+                    board={board}
+                    assignments={assignments}
+                    onAssign={handleAssign}
+                    onUnassign={handleUnassign}
+                    deviceType={deviceType === 'general' ? 'general' : deviceType}
+                  />
+                </PremiumCard>
               )}
 
               {/* Step 3: Settings */}
