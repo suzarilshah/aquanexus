@@ -29,7 +29,7 @@ export function DeviceList({ devices }: DeviceListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<Device | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<{ code?: string; message: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<{ code?: string; message: string; details?: string } | null>(null);
 
   const copyApiKey = async (apiKey: string, deviceId: string) => {
     await navigator.clipboard.writeText(apiKey);
@@ -63,8 +63,21 @@ export function DeviceList({ devices }: DeviceListProps) {
             message: data.message,
           });
         } else {
+          // Build detailed error message
+          let errorDetails = '';
+          if (data.details) {
+            errorDetails += `Error: ${data.details}\n`;
+          }
+          if (data.deletionLog && data.deletionLog.length > 0) {
+            errorDetails += `\nCompleted steps:\n${data.deletionLog.map((s: string) => `  - ${s}`).join('\n')}`;
+          }
+          if (data.hint) {
+            errorDetails += `\n\nHint: ${data.hint}`;
+          }
+
           setDeleteError({
-            message: data.error || 'Failed to delete device',
+            message: data.error || 'Failed to delete device. Please try again.',
+            details: errorDetails || undefined,
           });
         }
         return;
@@ -303,8 +316,19 @@ export function DeviceList({ devices }: DeviceListProps) {
                 </p>
 
                 {deleteError && !deleteError.code && (
-                  <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-                    {deleteError.message}
+                  <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
+                    <p className="text-sm font-medium text-red-700 mb-1">Error deleting device</p>
+                    <p className="text-sm text-red-600">{deleteError.message}</p>
+                    {deleteError.details && (
+                      <details className="mt-2">
+                        <summary className="text-xs text-red-500 cursor-pointer hover:underline">
+                          Show technical details
+                        </summary>
+                        <pre className="mt-1 text-xs text-red-400 bg-red-100 p-2 rounded overflow-x-auto">
+                          {deleteError.details}
+                        </pre>
+                      </details>
+                    )}
                   </div>
                 )}
 
