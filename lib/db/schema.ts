@@ -371,7 +371,7 @@ export const deviceHealthchecks = pgTable('device_healthchecks', {
 });
 
 // Streaming speed enum for virtual device environments
-export const streamingSpeedEnum = pgEnum('streaming_speed', ['1x', '2x', '5x', '10x', '20x']);
+export const streamingSpeedEnum = pgEnum('streaming_speed', ['1x', '2x', '5x', '10x', '20x', '100x']);
 
 // Virtual device environments table - supports multiple environments with different speeds
 export const virtualDeviceEnvironments = pgTable('virtual_device_environments', {

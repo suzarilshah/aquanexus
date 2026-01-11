@@ -54,7 +54,7 @@ interface VirtualEnvironment {
   name: string;
   description: string | null;
   enabled: boolean;
-  streamingSpeed: '1x' | '2x' | '5x' | '10x' | '20x';
+  streamingSpeed: '1x' | '2x' | '5x' | '10x' | '20x' | '100x';
   dataSource: string;
   fishDeviceId: string | null;
   plantDeviceId: string | null;
@@ -77,6 +77,7 @@ const SPEED_OPTIONS = [
   { value: '5x', label: '5X', description: '5 readings per trigger - completes 5x faster', color: 'green' },
   { value: '10x', label: '10X', description: '10 readings per trigger - completes 10x faster', color: 'orange' },
   { value: '20x', label: '20X', description: '20 readings per trigger - completes 20x faster', color: 'red' },
+  { value: '100x', label: '100X', description: '100 readings per trigger - completes in ~4 hours', color: 'purple' },
 ] as const;
 
 export default function SettingsPage() {
@@ -126,7 +127,7 @@ export default function SettingsPage() {
   const [newEnv, setNewEnv] = useState<{
     name: string;
     description: string;
-    streamingSpeed: '1x' | '2x' | '5x' | '10x' | '20x';
+    streamingSpeed: '1x' | '2x' | '5x' | '10x' | '20x' | '100x';
     dataSource: string;
     fishDeviceId: string;
     plantDeviceId: string;
@@ -539,6 +540,7 @@ export default function SettingsPage() {
       case 'green': return 'bg-green-100 text-green-700 border-green-200';
       case 'orange': return 'bg-orange-100 text-orange-700 border-orange-200';
       case 'red': return 'bg-red-100 text-red-700 border-red-200';
+      case 'purple': return 'bg-purple-100 text-purple-700 border-purple-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
@@ -633,7 +635,7 @@ export default function SettingsPage() {
                   {SPEED_OPTIONS.map((option) => (
                     <button
                       key={option.value}
-                      onClick={() => setNewEnv({ ...newEnv, streamingSpeed: option.value as '1x' | '2x' | '5x' | '10x' | '20x' })}
+                      onClick={() => setNewEnv({ ...newEnv, streamingSpeed: option.value as '1x' | '2x' | '5x' | '10x' | '20x' | '100x' })}
                       className={`p-3 rounded-lg border-2 text-left transition-all ${
                         newEnv.streamingSpeed === option.value
                           ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200'

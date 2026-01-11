@@ -16,6 +16,7 @@ export const SPEED_CONFIGS = {
   '5x': { readingsPerTrigger: 5, label: '5X', description: '5 readings per trigger - completes 5x faster' },
   '10x': { readingsPerTrigger: 10, label: '10X', description: '10 readings per trigger - completes 10x faster' },
   '20x': { readingsPerTrigger: 20, label: '20X', description: '20 readings per trigger - completes 20x faster' },
+  '100x': { readingsPerTrigger: 100, label: '100X', description: '100 readings per trigger - completes in ~4 hours' },
 } as const;
 
 export type StreamingSpeed = keyof typeof SPEED_CONFIGS;
