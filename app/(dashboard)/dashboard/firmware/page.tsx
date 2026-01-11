@@ -657,10 +657,21 @@ export default function FirmwareConfiguratorPage() {
                             </span>
                           </Label>
 
-                          {/* Debug: Show loaded devices count */}
-                          {!loadingDevices && devices.length > 0 && (
-                            <div className="text-xs text-gray-400 mb-2">
-                              Found {devices.length} device(s): {devices.map(d => `${d.deviceName} (${d.deviceType})`).join(', ')}
+                          {/* Debug: Show loaded devices - always visible during development */}
+                          {!loadingDevices && (
+                            <div className="text-xs bg-slate-100 p-2 rounded-lg mb-2 font-mono">
+                              <div className="text-slate-600 font-semibold">Debug: {devices.length} device(s) loaded</div>
+                              {devices.length > 0 ? (
+                                <ul className="mt-1 space-y-0.5">
+                                  {devices.map(d => (
+                                    <li key={d.id} className="text-slate-500">
+                                      - {d.deviceName} | type: <span className={d.deviceType === 'fish' ? 'text-cyan-600' : 'text-emerald-600'}>{d.deviceType}</span> | mac: {d.deviceMac}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="text-amber-600 mt-1">No devices returned from API</div>
+                              )}
                             </div>
                           )}
 
@@ -715,32 +726,39 @@ export default function FirmwareConfiguratorPage() {
                                 </Select.Icon>
                               </Select.Trigger>
                               <Select.Portal>
-                                <Select.Content className="overflow-hidden bg-white rounded-xl shadow-2xl border border-gray-200 z-50">
-                                  <Select.Viewport className="p-2">
-                                    {devices.map((device) => (
-                                      <Select.Item
-                                        key={device.id}
-                                        value={device.id}
-                                        className="px-3 py-3 text-sm cursor-pointer hover:bg-cyan-50 rounded-lg outline-none flex items-center gap-3 data-[highlighted]:bg-cyan-50"
-                                      >
-                                        {device.deviceType === 'fish' ? (
-                                          <Fish className="h-4 w-4 text-cyan-500 flex-shrink-0" />
-                                        ) : device.deviceType === 'plant' ? (
-                                          <Leaf className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                                        ) : (
-                                          <Cpu className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                        )}
-                                        <Select.ItemText asChild>
+                                <Select.Content
+                                  className="overflow-hidden bg-white rounded-xl shadow-2xl border border-gray-200 z-[100]"
+                                  position="popper"
+                                  sideOffset={4}
+                                >
+                                  <Select.Viewport className="p-2 max-h-[300px]">
+                                    {devices.length === 0 ? (
+                                      <div className="px-3 py-2 text-sm text-gray-500">No devices found</div>
+                                    ) : (
+                                      devices.map((device) => (
+                                        <Select.Item
+                                          key={device.id}
+                                          value={device.id}
+                                          className="relative flex items-center gap-3 px-3 py-3 text-sm cursor-pointer rounded-lg outline-none select-none data-[highlighted]:bg-cyan-50 data-[state=checked]:bg-cyan-100"
+                                        >
+                                          {device.deviceType === 'fish' ? (
+                                            <Fish className="h-4 w-4 text-cyan-500 flex-shrink-0" />
+                                          ) : device.deviceType === 'plant' ? (
+                                            <Leaf className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                                          ) : (
+                                            <Cpu className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                          )}
                                           <div className="flex-1 min-w-0">
-                                            <div className="font-medium text-gray-900 truncate">{device.deviceName}</div>
+                                            <Select.ItemText>{device.deviceName}</Select.ItemText>
                                             <div className="text-xs text-gray-500 font-mono truncate">{device.deviceMac}</div>
+                                            <div className="text-[10px] text-gray-400 uppercase tracking-wider">{device.deviceType}</div>
                                           </div>
-                                        </Select.ItemText>
-                                        <Select.ItemIndicator className="flex-shrink-0">
-                                          <Check className="h-4 w-4 text-cyan-500" />
-                                        </Select.ItemIndicator>
-                                      </Select.Item>
-                                    ))}
+                                          <Select.ItemIndicator className="flex-shrink-0">
+                                            <Check className="h-4 w-4 text-cyan-500" />
+                                          </Select.ItemIndicator>
+                                        </Select.Item>
+                                      ))
+                                    )}
                                   </Select.Viewport>
                                 </Select.Content>
                               </Select.Portal>
