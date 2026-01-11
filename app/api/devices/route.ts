@@ -6,6 +6,8 @@ import { getSession } from '@/lib/auth';
 import { generateApiKey } from '@/lib/utils';
 import { getDeviceInterval } from '@/lib/utils/device-intervals';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const session = await getSession();

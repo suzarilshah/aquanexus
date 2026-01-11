@@ -4,6 +4,8 @@ import { alerts, devices, streamingEventLogs, cronExecutionLogs } from '@/lib/db
 import { eq, desc, and, or, sql, gte, lte } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const session = await getSession();

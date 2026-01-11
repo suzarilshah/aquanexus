@@ -5,6 +5,8 @@ import { eq, desc, and, gte } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 import { analyzeWithConsensus, generateAnalysisPrompt } from '@/lib/ai/consensus';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const session = await getSession();

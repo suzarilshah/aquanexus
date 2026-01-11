@@ -18,6 +18,8 @@ import { eq, and, or, inArray } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 import { generateApiKey } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+
 // Helper function for detailed error logging
 function logError(operation: string, error: unknown, context?: Record<string, unknown>) {
   const errorMessage = error instanceof Error ? error.message : String(error);

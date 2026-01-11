@@ -4,6 +4,8 @@ import { devices, plantReadings, plantGrowth, fishReadings, predictions, mlModel
 import { eq, desc, and, gte } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 // Simple moving average prediction for serverless (fallback when ML model not available)
 function simpleMovingAverageForecast(
   data: number[],

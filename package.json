@@ -12,8 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "test": "playwright test",
-    "test:ui": "playwright test --ui",
-    "postinstall": "npx playwright install --with-deps chromium || true"
+    "test:ui": "playwright test --ui"
   },
   "dependencies": {
     "@xyflow/react": "^12.0.0",

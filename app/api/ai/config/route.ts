@@ -5,6 +5,8 @@ import { eq } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 import { testAIConnection } from '@/lib/ai/client';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const session = await getSession();

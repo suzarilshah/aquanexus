@@ -4,6 +4,8 @@ import { devices, plantReadings, plantGrowth, fishReadings, mlModels, trainingDa
 import { eq, and, gte, desc } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 // This endpoint triggers model training
 // In production, this would call the Python ML service or trigger a background job
 // For now, it prepares the data and stores a training job record

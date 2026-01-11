@@ -5,6 +5,8 @@ import { virtualDeviceConfig, deviceStreamingSessions } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { pauseSession, getSessionWithProgress } from '@/lib/virtual-device/session-service';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const session = await getSession();

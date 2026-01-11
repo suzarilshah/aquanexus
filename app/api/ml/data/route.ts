@@ -4,6 +4,8 @@ import { devices, plantReadings, plantGrowth, fishReadings } from '@/lib/db/sche
 import { eq, and, gte, lte, desc, asc } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 // GET endpoint to fetch historical data for ML training or visualization
 export async function GET(request: Request) {
   try {

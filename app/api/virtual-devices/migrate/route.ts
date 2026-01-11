@@ -7,6 +7,8 @@ import {
   retireLegacyCronJob,
 } from '@/lib/virtual-device/migration-service';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/virtual-devices/migrate
  * Check migration status for the current user

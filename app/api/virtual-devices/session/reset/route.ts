@@ -6,6 +6,8 @@ import { eq } from 'drizzle-orm';
 import { resetSession, getSessionWithProgress } from '@/lib/virtual-device/session-service';
 import { getDatasetSummary } from '@/lib/virtual-device/csv-parser';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const session = await getSession();

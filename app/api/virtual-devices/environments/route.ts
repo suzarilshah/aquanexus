@@ -10,6 +10,8 @@ import {
   StreamingSpeed,
 } from '@/lib/virtual-device/cronjob-org-client';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/virtual-devices/environments
  * List all virtual device environments for the current user

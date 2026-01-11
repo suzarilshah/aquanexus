@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { virtualDeviceConfig, devices } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
 // DEPRECATED: This API has been retired in favor of the multi-environment system.
 // Use /api/virtual-devices/environments instead.
 // This endpoint remains for backward compatibility and to support the legacy Settings UI section.

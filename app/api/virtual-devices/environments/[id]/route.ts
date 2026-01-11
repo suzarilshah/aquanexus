@@ -11,6 +11,8 @@ import {
   StreamingSpeed,
 } from '@/lib/virtual-device/cronjob-org-client';
 
+export const dynamic = 'force-dynamic';
+
 interface RouteParams {
   params: Promise<{ id: string }>;
 }

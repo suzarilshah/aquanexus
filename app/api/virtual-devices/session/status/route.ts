@@ -7,6 +7,8 @@ import { getActiveSessions, getSessionWithProgress } from '@/lib/virtual-device/
 import { getSessionEvents, getRecentCronRuns } from '@/lib/virtual-device/logging-service';
 import { getDatasetSummary } from '@/lib/virtual-device/csv-parser';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const session = await getSession();

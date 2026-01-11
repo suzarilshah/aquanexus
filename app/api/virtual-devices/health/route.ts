@@ -10,6 +10,8 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getHealthCheck, checkAndCreateAlerts } from '@/lib/virtual-device/sync-service';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const startTime = Date.now();
 

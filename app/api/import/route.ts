@@ -4,6 +4,8 @@ import { devices, fishReadings, plantReadings, plantGrowth } from '@/lib/db/sche
 import { eq, and } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 // Helper function to find column index by various name formats
 function findColumnIndex(headers: string[], ...possibleNames: string[]): number {
   for (const name of possibleNames) {
