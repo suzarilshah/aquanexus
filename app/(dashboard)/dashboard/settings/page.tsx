@@ -72,13 +72,15 @@ interface VirtualEnvironment {
   updatedAt: string;
 }
 
+// Speed options - CRON runs every 5 hours (matching CSV data timing)
+// Speed determines how many readings are processed per 5-hour trigger
 const SPEED_OPTIONS = [
-  { value: '1x', label: '1X (Real-time)', description: '1 reading per 5 hours - matches CSV timing exactly', color: 'gray' },
-  { value: '2x', label: '2X', description: '2 readings per trigger - completes 2x faster', color: 'blue' },
-  { value: '5x', label: '5X', description: '5 readings per trigger - completes 5x faster', color: 'green' },
-  { value: '10x', label: '10X', description: '10 readings per trigger - completes 10x faster', color: 'orange' },
-  { value: '20x', label: '20X', description: '20 readings per trigger - completes 20x faster', color: 'red' },
-  { value: '100x', label: '100X', description: '100 readings per trigger - completes in ~4 hours', color: 'purple' },
+  { value: '1x', label: '1X (Real-time)', description: '1 reading every 5 hours - matches original CSV timing (~92 days)', color: 'gray' },
+  { value: '2x', label: '2X', description: '2 readings every 5 hours - completes in ~46 days', color: 'blue' },
+  { value: '5x', label: '5X', description: '5 readings every 5 hours - completes in ~18 days', color: 'green' },
+  { value: '10x', label: '10X', description: '10 readings every 5 hours - completes in ~9 days', color: 'orange' },
+  { value: '20x', label: '20X', description: '20 readings every 5 hours - completes in ~5 days', color: 'red' },
+  { value: '100x', label: '100X', description: '100 readings every 5 hours - completes in ~22 hours', color: 'purple' },
 ] as const;
 
 export default function SettingsPage() {
@@ -1075,10 +1077,10 @@ export default function SettingsPage() {
               <div className="text-sm">
                 <p className="font-medium text-indigo-900 mb-1">About Streaming Speeds</p>
                 <p className="text-indigo-700">
-                  Each environment runs its own CRON job on cron-job.org. The speed determines how many readings
-                  are sent per trigger - <strong>1X</strong> sends 1 reading (matching real CSV timing), while
-                  <strong> 20X</strong> sends 20 readings per trigger, completing the dataset 20x faster.
-                  All timestamps maintain 5-hour intervals regardless of speed.
+                  Each environment runs its own CRON job on cron-job.org <strong>every 5 hours</strong> (at 00:00, 05:00, 10:00, 15:00, 20:00 UTC).
+                  This matches the original CSV data interval. The speed determines how many readings
+                  are sent per trigger - <strong>1X</strong> sends 1 reading per 5-hour trigger (real-time simulation), while
+                  <strong> 100X</strong> sends 100 readings per trigger, completing the 440-row dataset in about 22 hours.
                 </p>
               </div>
             </div>

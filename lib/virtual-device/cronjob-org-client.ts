@@ -8,15 +8,22 @@
 const CRONJOB_API_URL = 'https://api.cron-job.org';
 const CRONJOB_API_KEY = process.env.CRONJOB_ORG_API_KEY || '3KjxViJoTMHiXOnOA38QdIIErIFgUTpH7HqCzqMMxhk=';
 
-// Streaming speed to cron interval mapping
-// All environments run every 5 minutes, but process different numbers of readings
+// Streaming speed configuration
+// All environments run every 5 HOURS (matching CSV data interval), but process different numbers of readings
+// CSV data has readings every 5 hours, so:
+// - 1X = 1 reading per 5-hour trigger = real-time simulation (~92 days for 440 rows)
+// - 2X = 2 readings per 5-hour trigger = completes in ~46 days
+// - 5X = 5 readings per 5-hour trigger = completes in ~18 days
+// - 10X = 10 readings per 5-hour trigger = completes in ~9 days
+// - 20X = 20 readings per 5-hour trigger = completes in ~5 days
+// - 100X = 100 readings per 5-hour trigger = completes in ~22 hours
 export const SPEED_CONFIGS = {
-  '1x': { readingsPerTrigger: 1, label: '1X (Real-time)', description: '1 reading per 5 hours - matches CSV timing exactly' },
-  '2x': { readingsPerTrigger: 2, label: '2X', description: '2 readings per trigger - completes 2x faster' },
-  '5x': { readingsPerTrigger: 5, label: '5X', description: '5 readings per trigger - completes 5x faster' },
-  '10x': { readingsPerTrigger: 10, label: '10X', description: '10 readings per trigger - completes 10x faster' },
-  '20x': { readingsPerTrigger: 20, label: '20X', description: '20 readings per trigger - completes 20x faster' },
-  '100x': { readingsPerTrigger: 100, label: '100X', description: '100 readings per trigger - completes in ~4 hours' },
+  '1x': { readingsPerTrigger: 1, label: '1X (Real-time)', description: '1 reading every 5 hours - matches original CSV timing' },
+  '2x': { readingsPerTrigger: 2, label: '2X', description: '2 readings every 5 hours - completes in ~46 days' },
+  '5x': { readingsPerTrigger: 5, label: '5X', description: '5 readings every 5 hours - completes in ~18 days' },
+  '10x': { readingsPerTrigger: 10, label: '10X', description: '10 readings every 5 hours - completes in ~9 days' },
+  '20x': { readingsPerTrigger: 20, label: '20X', description: '20 readings every 5 hours - completes in ~5 days' },
+  '100x': { readingsPerTrigger: 100, label: '100X', description: '100 readings every 5 hours - completes in ~22 hours' },
 } as const;
 
 export type StreamingSpeed = keyof typeof SPEED_CONFIGS;
@@ -232,12 +239,14 @@ export async function toggleCronJob(jobId: number, enabled: boolean): Promise<{ 
 
 /**
  * Create cron job schedule for virtual device environment
- * All jobs run every 5 minutes - the speed is controlled by readings per trigger
+ * All jobs run every 5 HOURS - matching the original CSV data interval
+ * This matches the legacy system timing: runs at 00:00, 05:00, 10:00, 15:00, 20:00 UTC
+ * The speed is controlled by the number of readings processed per trigger
  */
 export function createEnvironmentSchedule(): CronJobConfig['schedule'] {
   return {
-    minutes: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], // Every 5 minutes
-    hours: [-1], // Every hour (-1 means all)
+    minutes: [0], // At the start of the hour
+    hours: [0, 5, 10, 15, 20], // Every 5 hours: 12am, 5am, 10am, 3pm, 8pm
     mdays: [-1], // Every day
     months: [-1], // Every month
     wdays: [-1], // Every weekday
