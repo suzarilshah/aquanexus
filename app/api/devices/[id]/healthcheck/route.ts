@@ -4,6 +4,8 @@ import { devices, deviceHealthchecks } from '@/lib/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
