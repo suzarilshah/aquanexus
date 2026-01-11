@@ -370,6 +370,51 @@ export const deviceHealthchecks = pgTable('device_healthchecks', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Streaming speed enum for virtual device environments
+export const streamingSpeedEnum = pgEnum('streaming_speed', ['1x', '2x', '5x', '10x', '20x']);
+
+// Virtual device environments table - supports multiple environments with different speeds
+export const virtualDeviceEnvironments = pgTable('virtual_device_environments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+
+  // Environment info
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+
+  // Device references (one fish + one plant per environment)
+  fishDeviceId: uuid('fish_device_id').references(() => devices.id),
+  plantDeviceId: uuid('plant_device_id').references(() => devices.id),
+
+  // Streaming configuration
+  enabled: boolean('enabled').default(false).notNull(),
+  streamingSpeed: streamingSpeedEnum('streaming_speed').default('1x').notNull(),
+  dataSource: varchar('data_source', { length: 50 }).default('training'),
+
+  // cron-job.org integration
+  cronJobId: integer('cron_job_id'), // ID from cron-job.org API
+  cronJobEnabled: boolean('cron_job_enabled').default(false).notNull(),
+  cronJobLastSync: timestamp('cron_job_last_sync'),
+  cronJobUrl: text('cron_job_url'), // The URL cron-job.org calls
+
+  // Session management
+  fishSessionId: uuid('fish_session_id').references(() => deviceStreamingSessions.id),
+  plantSessionId: uuid('plant_session_id').references(() => deviceStreamingSessions.id),
+
+  // Progress tracking
+  currentFishIndex: integer('current_fish_index').default(0),
+  currentPlantIndex: integer('current_plant_index').default(0),
+  lastStreamedAt: timestamp('last_streamed_at'),
+
+  // User preferences
+  dataRetentionOnReset: varchar('data_retention_on_reset', { length: 20 }).default('ask'),
+  notifyOnCompletion: boolean('notify_on_completion').default(true),
+  notifyOnError: boolean('notify_on_error').default(true),
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -407,3 +452,5 @@ export type CronHealthMetrics = typeof cronHealthMetrics.$inferSelect;
 export type NewCronHealthMetrics = typeof cronHealthMetrics.$inferInsert;
 export type DeviceHealthcheck = typeof deviceHealthchecks.$inferSelect;
 export type NewDeviceHealthcheck = typeof deviceHealthchecks.$inferInsert;
+export type VirtualDeviceEnvironment = typeof virtualDeviceEnvironments.$inferSelect;
+export type NewVirtualDeviceEnvironment = typeof virtualDeviceEnvironments.$inferInsert;

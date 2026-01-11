@@ -6,7 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Save, TestTube, CheckCircle, XCircle, Loader2, Brain, AlertTriangle, ChevronDown, ChevronUp, Radio, Fish, Leaf, Trash2, Power, Cpu, ExternalLink } from 'lucide-react';
+import {
+  Save, TestTube, CheckCircle, XCircle, Loader2, Brain, AlertTriangle,
+  ChevronDown, ChevronUp, Radio, Fish, Leaf, Trash2, Power, Cpu, ExternalLink,
+  Plus, Clock, Zap, RefreshCw, Settings2, Play, Pause, MoreVertical, Globe
+} from 'lucide-react';
 
 interface AIConfig {
   model1Name: string;
@@ -44,6 +48,36 @@ interface VirtualDeviceConfig {
   fishDeviceId: string | null;
   plantDeviceId: string | null;
 }
+
+interface VirtualEnvironment {
+  id: string;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  streamingSpeed: '1x' | '2x' | '5x' | '10x' | '20x';
+  dataSource: string;
+  fishDeviceId: string | null;
+  plantDeviceId: string | null;
+  fishDevice?: { id: string; name: string; mac: string } | null;
+  plantDevice?: { id: string; name: string; mac: string } | null;
+  cronJobId: number | null;
+  cronJobEnabled: boolean;
+  cronJobLastSync: string | null;
+  cronJobUrl: string | null;
+  currentFishIndex: number;
+  currentPlantIndex: number;
+  lastStreamedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const SPEED_OPTIONS = [
+  { value: '1x', label: '1X (Real-time)', description: '1 reading per 5 hours - matches CSV timing exactly', color: 'gray' },
+  { value: '2x', label: '2X', description: '2 readings per trigger - completes 2x faster', color: 'blue' },
+  { value: '5x', label: '5X', description: '5 readings per trigger - completes 5x faster', color: 'green' },
+  { value: '10x', label: '10X', description: '10 readings per trigger - completes 10x faster', color: 'orange' },
+  { value: '20x', label: '20X', description: '20 readings per trigger - completes 20x faster', color: 'red' },
+] as const;
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<AIConfig>({
@@ -85,9 +119,34 @@ export default function SettingsPage() {
   const [isVirtualSaving, setIsVirtualSaving] = useState(false);
   const [isVirtualDeleting, setIsVirtualDeleting] = useState(false);
 
+  // Multi-environment state
+  const [environments, setEnvironments] = useState<VirtualEnvironment[]>([]);
+  const [isEnvLoading, setIsEnvLoading] = useState(true);
+  const [showCreateEnv, setShowCreateEnv] = useState(false);
+  const [newEnv, setNewEnv] = useState<{
+    name: string;
+    description: string;
+    streamingSpeed: '1x' | '2x' | '5x' | '10x' | '20x';
+    dataSource: string;
+    fishDeviceId: string;
+    plantDeviceId: string;
+  }>({
+    name: '',
+    description: '',
+    streamingSpeed: '1x',
+    dataSource: 'training',
+    fishDeviceId: '',
+    plantDeviceId: '',
+  });
+  const [isCreatingEnv, setIsCreatingEnv] = useState(false);
+  const [syncingEnvId, setSyncingEnvId] = useState<string | null>(null);
+  const [deletingEnvId, setDeletingEnvId] = useState<string | null>(null);
+  const [togglingEnvId, setTogglingEnvId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchConfig();
     fetchVirtualConfig();
+    fetchEnvironments();
   }, []);
 
   const renderErrorDetails = (modelKey: 'model1' | 'model2') => {
@@ -190,6 +249,21 @@ export default function SettingsPage() {
     }
   };
 
+  const fetchEnvironments = async () => {
+    setIsEnvLoading(true);
+    try {
+      const res = await fetch('/api/virtual-devices/environments');
+      const data = await res.json();
+      if (data.environments) {
+        setEnvironments(data.environments);
+      }
+    } catch {
+      toast.error('Failed to load environments');
+    } finally {
+      setIsEnvLoading(false);
+    }
+  };
+
   const handleVirtualDeviceSave = async () => {
     setIsVirtualSaving(true);
     try {
@@ -249,6 +323,129 @@ export default function SettingsPage() {
       toast.error(error instanceof Error ? error.message : 'Failed to clear configuration');
     } finally {
       setIsVirtualDeleting(false);
+    }
+  };
+
+  const handleCreateEnvironment = async () => {
+    if (!newEnv.name.trim()) {
+      toast.error('Environment name is required');
+      return;
+    }
+
+    setIsCreatingEnv(true);
+    try {
+      const res = await fetch('/api/virtual-devices/environments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newEnv.name,
+          description: newEnv.description || null,
+          streamingSpeed: newEnv.streamingSpeed,
+          dataSource: newEnv.dataSource,
+          fishDeviceId: newEnv.fishDeviceId || null,
+          plantDeviceId: newEnv.plantDeviceId || null,
+          createCronJob: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create environment');
+      }
+
+      toast.success('Environment created successfully');
+      setShowCreateEnv(false);
+      setNewEnv({
+        name: '',
+        description: '',
+        streamingSpeed: '1x' as const,
+        dataSource: 'training',
+        fishDeviceId: '',
+        plantDeviceId: '',
+      });
+      await fetchEnvironments();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create environment');
+    } finally {
+      setIsCreatingEnv(false);
+    }
+  };
+
+  const handleToggleEnvironment = async (env: VirtualEnvironment) => {
+    setTogglingEnvId(env.id);
+    try {
+      const res = await fetch(`/api/virtual-devices/environments/${env.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: !env.enabled,
+          syncCronJob: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to toggle environment');
+      }
+
+      toast.success(env.enabled ? 'Environment disabled' : 'Environment enabled');
+      await fetchEnvironments();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to toggle environment');
+    } finally {
+      setTogglingEnvId(null);
+    }
+  };
+
+  const handleSyncCronJob = async (envId: string) => {
+    setSyncingEnvId(envId);
+    try {
+      const res = await fetch(`/api/virtual-devices/environments/${envId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ syncCronJob: true }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to sync cron job');
+      }
+
+      toast.success('Cron job synchronized');
+      await fetchEnvironments();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to sync cron job');
+    } finally {
+      setSyncingEnvId(null);
+    }
+  };
+
+  const handleDeleteEnvironment = async (envId: string) => {
+    if (!confirm('Are you sure you want to delete this environment? This will also delete the associated cron job.')) {
+      return;
+    }
+
+    setDeletingEnvId(envId);
+    try {
+      const res = await fetch(`/api/virtual-devices/environments/${envId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete environment');
+      }
+
+      toast.success('Environment deleted');
+      await fetchEnvironments();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete environment');
+    } finally {
+      setDeletingEnvId(null);
     }
   };
 
@@ -335,6 +532,17 @@ export default function SettingsPage() {
     return devices.find(d => d.id === deviceId) || null;
   };
 
+  const getSpeedColor = (speed: string) => {
+    const option = SPEED_OPTIONS.find(o => o.value === speed);
+    switch (option?.color) {
+      case 'blue': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'green': return 'bg-green-100 text-green-700 border-green-200';
+      case 'orange': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'red': return 'bg-red-100 text-red-700 border-red-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -356,7 +564,384 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* Virtual ESP32 Configuration - Moved to top for prominence */}
+      {/* Multi-Environment Virtual Device Streaming */}
+      <Card className="border-2 border-indigo-200 shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 shadow-lg">
+                <Globe className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Virtual Device Environments</CardTitle>
+                <CardDescription>
+                  Create multiple streaming environments with different speeds
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowCreateEnv(!showCreateEnv)}
+              className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Environment
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6 pt-6">
+          {/* Create Environment Form */}
+          {showCreateEnv && (
+            <div className="rounded-xl border-2 border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 p-6 space-y-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Settings2 className="h-5 w-5 text-indigo-600" />
+                <h3 className="font-semibold text-gray-900">Create New Environment</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="envName" className="text-sm font-medium text-gray-700">
+                    Environment Name *
+                  </Label>
+                  <Input
+                    id="envName"
+                    value={newEnv.name}
+                    onChange={(e) => setNewEnv({ ...newEnv, name: e.target.value })}
+                    placeholder="e.g., Fast Testing, Production Simulation"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="envDescription" className="text-sm font-medium text-gray-700">
+                    Description
+                  </Label>
+                  <Input
+                    id="envDescription"
+                    value={newEnv.description}
+                    onChange={(e) => setNewEnv({ ...newEnv, description: e.target.value })}
+                    placeholder="Optional description"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              {/* Streaming Speed Selection */}
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-3 block">
+                  Streaming Speed
+                </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  {SPEED_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setNewEnv({ ...newEnv, streamingSpeed: option.value as '1x' | '2x' | '5x' | '10x' | '20x' })}
+                      className={`p-3 rounded-lg border-2 text-left transition-all ${
+                        newEnv.streamingSpeed === option.value
+                          ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Zap className={`h-4 w-4 ${
+                          newEnv.streamingSpeed === option.value ? 'text-indigo-600' : 'text-gray-400'
+                        }`} />
+                        <span className={`font-semibold text-sm ${
+                          newEnv.streamingSpeed === option.value ? 'text-indigo-700' : 'text-gray-700'
+                        }`}>
+                          {option.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 leading-tight">{option.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Device Selection */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="newEnvFish" className="text-sm font-medium text-gray-700">
+                    Fish Device
+                  </Label>
+                  <select
+                    id="newEnvFish"
+                    value={newEnv.fishDeviceId}
+                    onChange={(e) => setNewEnv({ ...newEnv, fishDeviceId: e.target.value })}
+                    className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  >
+                    <option value="">-- Select fish device --</option>
+                    {fishDevices.map((device) => (
+                      <option key={device.id} value={device.id}>
+                        {device.name} ({device.mac})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="newEnvPlant" className="text-sm font-medium text-gray-700">
+                    Plant Device
+                  </Label>
+                  <select
+                    id="newEnvPlant"
+                    value={newEnv.plantDeviceId}
+                    onChange={(e) => setNewEnv({ ...newEnv, plantDeviceId: e.target.value })}
+                    className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  >
+                    <option value="">-- Select plant device --</option>
+                    {plantDevices.map((device) => (
+                      <option key={device.id} value={device.id}>
+                        {device.name} ({device.mac})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Data Source */}
+              <div>
+                <Label htmlFor="newEnvDataSource" className="text-sm font-medium text-gray-700">
+                  Data Source
+                </Label>
+                <select
+                  id="newEnvDataSource"
+                  value={newEnv.dataSource}
+                  onChange={(e) => setNewEnv({ ...newEnv, dataSource: e.target.value })}
+                  className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option value="training">Training Data (fish/plant_initial.csv)</option>
+                  <option value="validation">Validation Data (fish/plant_validate.csv)</option>
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCreateEnv(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateEnvironment}
+                  disabled={isCreatingEnv || !newEnv.name.trim()}
+                  className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+                >
+                  {isCreatingEnv ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Environment
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Environments List */}
+          {isEnvLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+            </div>
+          ) : environments.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+              <Globe className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-1">No Environments Yet</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Create your first virtual device environment to start streaming data
+              </p>
+              <Button
+                onClick={() => setShowCreateEnv(true)}
+                variant="outline"
+                className="border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Environment
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {environments.map((env) => (
+                <div
+                  key={env.id}
+                  className={`rounded-xl border-2 p-5 transition-all ${
+                    env.enabled
+                      ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-emerald-50/50'
+                      : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    {/* Left side - Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-semibold text-gray-900 truncate">{env.name}</h3>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getSpeedColor(env.streamingSpeed)}`}>
+                          {env.streamingSpeed.toUpperCase()}
+                        </span>
+                        {env.enabled ? (
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                            Active
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                            Disabled
+                          </span>
+                        )}
+                      </div>
+
+                      {env.description && (
+                        <p className="text-sm text-gray-500 mb-3">{env.description}</p>
+                      )}
+
+                      {/* Devices */}
+                      <div className="flex flex-wrap items-center gap-4 text-sm">
+                        {env.fishDevice && (
+                          <div className="flex items-center gap-2 text-cyan-700">
+                            <Fish className="h-4 w-4" />
+                            <span>{env.fishDevice.name}</span>
+                          </div>
+                        )}
+                        {env.plantDevice && (
+                          <div className="flex items-center gap-2 text-green-700">
+                            <Leaf className="h-4 w-4" />
+                            <span>{env.plantDevice.name}</span>
+                          </div>
+                        )}
+                        {!env.fishDevice && !env.plantDevice && (
+                          <span className="text-gray-400 text-sm">No devices assigned</span>
+                        )}
+                      </div>
+
+                      {/* CRON Job Status */}
+                      <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                        {env.cronJobId ? (
+                          <>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5" />
+                              CRON ID: {env.cronJobId}
+                            </span>
+                            {env.cronJobLastSync && (
+                              <span>
+                                Last sync: {new Date(env.cronJobLastSync).toLocaleString()}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="flex items-center gap-1 text-amber-600">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            No CRON job linked
+                          </span>
+                        )}
+                        {env.lastStreamedAt && (
+                          <span className="flex items-center gap-1">
+                            <Radio className="h-3.5 w-3.5" />
+                            Last streamed: {new Date(env.lastStreamedAt).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Progress */}
+                      {(env.currentFishIndex > 0 || env.currentPlantIndex > 0) && (
+                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                          {env.currentFishIndex > 0 && (
+                            <span>Fish: Row {env.currentFishIndex}/440</span>
+                          )}
+                          {env.currentPlantIndex > 0 && (
+                            <span>Plant: Row {env.currentPlantIndex}/440</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right side - Actions */}
+                    <div className="flex items-center gap-2">
+                      {/* Toggle Enable/Disable */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleEnvironment(env)}
+                        disabled={togglingEnvId === env.id}
+                        className={env.enabled ? 'text-amber-600 border-amber-200 hover:bg-amber-50' : 'text-green-600 border-green-200 hover:bg-green-50'}
+                      >
+                        {togglingEnvId === env.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : env.enabled ? (
+                          <>
+                            <Pause className="h-4 w-4 mr-1" />
+                            Disable
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-1" />
+                            Enable
+                          </>
+                        )}
+                      </Button>
+
+                      {/* Sync CRON Job */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSyncCronJob(env.id)}
+                        disabled={syncingEnvId === env.id}
+                        className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                      >
+                        {syncingEnvId === env.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Sync CRON
+                          </>
+                        )}
+                      </Button>
+
+                      {/* Delete */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteEnvironment(env.id)}
+                        disabled={deletingEnvId === env.id}
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        {deletingEnvId === env.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Info Box */}
+          <div className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <Zap className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div className="text-sm">
+                <p className="font-medium text-indigo-900 mb-1">About Streaming Speeds</p>
+                <p className="text-indigo-700">
+                  Each environment runs its own CRON job on cron-job.org. The speed determines how many readings
+                  are sent per trigger - <strong>1X</strong> sends 1 reading (matching real CSV timing), while
+                  <strong> 20X</strong> sends 20 readings per trigger, completing the dataset 20x faster.
+                  All timestamps maintain 5-hour intervals regardless of speed.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Legacy Virtual ESP32 Configuration */}
       <Card className="border-2 border-purple-200 shadow-lg">
         <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50">
           <div className="flex items-center space-x-3">
@@ -364,9 +949,9 @@ export default function SettingsPage() {
               <Radio className="h-6 w-6 text-white" />
             </div>
             <div>
-              <CardTitle className="text-xl">Virtual Device Streaming</CardTitle>
+              <CardTitle className="text-xl">Virtual Device Streaming (Legacy)</CardTitle>
               <CardDescription>
-                Select registered devices to receive simulated sensor data
+                Original single-device configuration - use Environments above for multi-speed streaming
               </CardDescription>
             </div>
           </div>
