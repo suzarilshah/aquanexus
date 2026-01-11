@@ -31,11 +31,18 @@ import {
 // API Key for cron-job.org authentication
 const CRON_API_KEY = process.env.CRON_API_KEY || '3KjxViJoTMHiXOnOA38QdIIErIFgUTpH7HqCzqMMxhk=';
 
+// DEPRECATED: This endpoint has been retired in favor of the multi-environment system.
+// Use /api/cron/virtual-devices/environment?envId=<uuid> instead.
+// This cron job (ID 7143071) has been disabled on cron-job.org.
+// This endpoint remains for backward compatibility but will log deprecation warnings.
+
 export async function GET(request: Request) {
+  console.warn('[DEPRECATED] Legacy /api/cron/virtual-devices endpoint called. Use /api/cron/virtual-devices/environment instead.');
   return handleCronRequest(request, 'GET');
 }
 
 export async function POST(request: Request) {
+  console.warn('[DEPRECATED] Legacy /api/cron/virtual-devices endpoint called. Use /api/cron/virtual-devices/environment instead.');
   return handleCronRequest(request, 'POST');
 }
 

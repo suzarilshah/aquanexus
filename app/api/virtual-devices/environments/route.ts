@@ -124,7 +124,7 @@ export async function POST(request: Request) {
     // Validate streaming speed
     if (!Object.keys(SPEED_CONFIGS).includes(streamingSpeed)) {
       return NextResponse.json(
-        { error: 'Invalid streaming speed. Must be one of: 1x, 2x, 5x, 10x, 20x' },
+        { error: `Invalid streaming speed. Must be one of: ${Object.keys(SPEED_CONFIGS).join(', ')}` },
         { status: 400 }
       );
     }

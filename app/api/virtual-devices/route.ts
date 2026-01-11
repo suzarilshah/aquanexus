@@ -4,8 +4,13 @@ import { db } from '@/lib/db';
 import { virtualDeviceConfig, devices } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
-// GET - Fetch virtual device configuration and available devices
+// DEPRECATED: This API has been retired in favor of the multi-environment system.
+// Use /api/virtual-devices/environments instead.
+// This endpoint remains for backward compatibility and to support the legacy Settings UI section.
+
+// GET - Fetch virtual device configuration and available devices (DEPRECATED)
 export async function GET() {
+  console.warn('[DEPRECATED] Legacy /api/virtual-devices GET called. Use /api/virtual-devices/environments instead.');
   try {
     const session = await getSession();
     if (!session) {

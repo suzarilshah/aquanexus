@@ -9,7 +9,8 @@ import { toast } from 'sonner';
 import {
   Save, TestTube, CheckCircle, XCircle, Loader2, Brain, AlertTriangle,
   ChevronDown, ChevronUp, Radio, Fish, Leaf, Trash2, Power, Cpu, ExternalLink,
-  Plus, Clock, Zap, RefreshCw, Settings2, Play, Pause, MoreVertical, Globe
+  Plus, Clock, Zap, RefreshCw, Settings2, Play, Pause, MoreVertical, Globe,
+  ArrowRight, Sparkles, Archive
 } from 'lucide-react';
 
 interface AIConfig {
@@ -144,11 +145,108 @@ export default function SettingsPage() {
   const [deletingEnvId, setDeletingEnvId] = useState<string | null>(null);
   const [togglingEnvId, setTogglingEnvId] = useState<string | null>(null);
 
+  // Migration state
+  const [migrationStatus, setMigrationStatus] = useState<{
+    hasLegacyConfig: boolean;
+    hasEnvironments: boolean;
+    needsMigration: boolean;
+    isChecking: boolean;
+    isMigrating: boolean;
+    isRetiringLegacy: boolean;
+    showLegacySection: boolean;
+  }>({
+    hasLegacyConfig: false,
+    hasEnvironments: false,
+    needsMigration: false,
+    isChecking: true,
+    isMigrating: false,
+    isRetiringLegacy: false,
+    showLegacySection: false,
+  });
+
   useEffect(() => {
     fetchConfig();
     fetchVirtualConfig();
     fetchEnvironments();
+    checkMigrationStatus();
   }, []);
+
+  const checkMigrationStatus = async () => {
+    try {
+      const res = await fetch('/api/virtual-devices/migrate');
+      const data = await res.json();
+      if (data.success) {
+        setMigrationStatus(prev => ({
+          ...prev,
+          hasLegacyConfig: data.hasLegacyConfig,
+          hasEnvironments: data.hasEnvironments,
+          needsMigration: data.needsMigration,
+          isChecking: false,
+          // Show legacy section only if user has legacy config and no environments yet
+          showLegacySection: data.hasLegacyConfig && !data.hasEnvironments,
+        }));
+      }
+    } catch {
+      setMigrationStatus(prev => ({ ...prev, isChecking: false }));
+    }
+  };
+
+  const handleMigrateLegacy = async () => {
+    setMigrationStatus(prev => ({ ...prev, isMigrating: true }));
+    try {
+      const res = await fetch('/api/virtual-devices/migrate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success('Successfully migrated to new environment system!');
+        // Refresh all data
+        await Promise.all([
+          fetchEnvironments(),
+          fetchVirtualConfig(),
+          checkMigrationStatus(),
+        ]);
+      } else {
+        toast.error(data.errors?.[0] || 'Migration failed');
+      }
+    } catch (error) {
+      toast.error('Failed to migrate configuration');
+    } finally {
+      setMigrationStatus(prev => ({ ...prev, isMigrating: false }));
+    }
+  };
+
+  const handleRetireLegacyCron = async () => {
+    if (!confirm('Are you sure you want to retire the legacy cron job? This action cannot be undone. Make sure all users have been migrated to the new environment system.')) {
+      return;
+    }
+
+    setMigrationStatus(prev => ({ ...prev, isRetiringLegacy: true }));
+    try {
+      const res = await fetch('/api/virtual-devices/migrate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'retire-legacy-cron' }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(data.message);
+        setMigrationStatus(prev => ({ ...prev, showLegacySection: false }));
+      } else {
+        toast.error(data.message || 'Failed to retire legacy cron job');
+      }
+    } catch (error) {
+      toast.error('Failed to retire legacy cron job');
+    } finally {
+      setMigrationStatus(prev => ({ ...prev, isRetiringLegacy: false }));
+    }
+  };
 
   const renderErrorDetails = (modelKey: 'model1' | 'model2') => {
     const error = connectionErrors[modelKey];
@@ -566,6 +664,51 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      {/* Migration Banner - Show when user has legacy config */}
+      {migrationStatus.needsMigration && !migrationStatus.isChecking && (
+        <Card className="border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 shadow-lg">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 p-3 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl shadow-lg">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-amber-900 mb-1">
+                  Upgrade to Multi-Environment Streaming
+                </h3>
+                <p className="text-sm text-amber-800 mb-4">
+                  We've detected you're using the legacy virtual device system. Migrate to our new
+                  multi-environment system with support for <strong>multiple streaming speeds (1X to 100X)</strong>,
+                  individual CRON jobs per environment, and better progress tracking.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={handleMigrateLegacy}
+                    disabled={migrationStatus.isMigrating}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                  >
+                    {migrationStatus.isMigrating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Migrating...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                        Migrate Now
+                      </>
+                    )}
+                  </Button>
+                  <span className="text-xs text-amber-700">
+                    Your existing configuration will be preserved as a new environment
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Multi-Environment Virtual Device Streaming */}
       <Card className="border-2 border-indigo-200 shadow-lg">
         <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50">
@@ -943,21 +1086,48 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Legacy Virtual ESP32 Configuration */}
-      <Card className="border-2 border-purple-200 shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50">
-          <div className="flex items-center space-x-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 shadow-lg">
-              <Radio className="h-6 w-6 text-white" />
+      {/* Legacy Virtual ESP32 Configuration - Hidden by default after migration */}
+      {(migrationStatus.showLegacySection || migrationStatus.hasLegacyConfig) && (
+      <Card className="border-2 border-gray-300 shadow-lg opacity-75">
+        <CardHeader className="bg-gradient-to-r from-gray-100 to-gray-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-gray-400 to-gray-500 shadow-lg">
+                <Archive className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-xl text-gray-600">Virtual Device Streaming (Legacy)</CardTitle>
+                  <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full border border-amber-200">
+                    Deprecated
+                  </span>
+                </div>
+                <CardDescription className="text-gray-500">
+                  This system is being retired. Please use the Environments section above.
+                </CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-xl">Virtual Device Streaming (Legacy)</CardTitle>
-              <CardDescription>
-                Original single-device configuration - use Environments above for multi-speed streaming
-              </CardDescription>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMigrationStatus(prev => ({ ...prev, showLegacySection: !prev.showLegacySection }))}
+              className="text-gray-500"
+            >
+              {migrationStatus.showLegacySection ? (
+                <>
+                  <ChevronUp className="h-4 w-4 mr-1" />
+                  Hide
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4 mr-1" />
+                  Show
+                </>
+              )}
+            </Button>
           </div>
         </CardHeader>
+        {migrationStatus.showLegacySection && (
         <CardContent className="space-y-6 pt-6">
           {/* Master Enable Toggle */}
           <div className="flex items-center justify-between rounded-xl border-2 border-gray-200 p-4 bg-gradient-to-r from-gray-50 to-white">
@@ -1204,34 +1374,9 @@ export default function SettingsPage() {
             </Button>
           </div>
         </CardContent>
+        )}
       </Card>
-
-      {/* Streaming API Info */}
-      <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
-        <CardContent className="pt-6">
-          <div className="flex items-start space-x-4">
-            <div className="flex-shrink-0 p-2 bg-purple-100 rounded-lg">
-              <Radio className="h-5 w-5 text-purple-600" />
-            </div>
-            <div className="text-sm text-purple-700 space-y-3 flex-1">
-              <p className="font-semibold text-purple-900">Automatic Streaming with Cron</p>
-              <p>
-                For continuous data streaming without keeping the browser open, set up an external cron service
-                (like cron-job.org) to call the streaming API endpoint every minute.
-              </p>
-              <div className="bg-white/70 rounded-lg p-3 border border-purple-100">
-                <p className="font-medium text-purple-800 mb-2">Streaming API Endpoint:</p>
-                <code className="block text-xs bg-purple-100 px-3 py-2 rounded-lg font-mono break-all">
-                  GET https://app.airail.uk/api/virtual-devices/stream
-                </code>
-                <p className="text-xs mt-2 text-purple-600">
-                  This endpoint streams one data point from the selected CSV for each enabled device.
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      )}
 
       {/* AI Configuration */}
       <Card>
