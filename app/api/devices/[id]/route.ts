@@ -11,7 +11,8 @@ import {
   aiAnalyses,
   hourlyAggregates,
   deviceStreamingSessions,
-  streamingEventLogs
+  streamingEventLogs,
+  deviceHealthchecks
 } from '@/lib/db/schema';
 import { eq, and, or, inArray } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
@@ -333,7 +334,16 @@ export async function DELETE(
       // Non-critical, continue
     }
 
-    // 7. Finally delete the device itself
+    // 7. Delete healthchecks
+    try {
+      await db.delete(deviceHealthchecks).where(eq(deviceHealthchecks.deviceId, params.id));
+      deletionLog.push(`Deleted healthchecks`);
+    } catch (e) {
+      console.warn(`[Device API] Warning: Could not delete healthchecks:`, e);
+      // Non-critical, continue
+    }
+
+    // 8. Finally delete the device itself
     try {
       await db.delete(devices).where(eq(devices.id, params.id));
       deletionLog.push(`Deleted device`);

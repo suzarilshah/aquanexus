@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { devices, fishReadings, plantReadings, plantGrowth, alerts } from '@/lib/db/schema';
+import { devices, fishReadings, plantReadings, plantGrowth, alerts, deviceHealthchecks } from '@/lib/db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 import { sensorUpdateEmitter } from '@/lib/realtime';
 
@@ -11,13 +11,47 @@ interface SensorReading {
   timestamp: string;
 }
 
+interface HealthcheckPayload {
+  device?: {
+    name?: string;
+    type?: string;
+    mac?: string;
+    firmwareVersion?: string;
+    board?: string;
+    chipId?: string;
+  };
+  system?: {
+    freeHeap?: number;
+    heapSize?: number;
+    minFreeHeap?: number;
+    uptimeMs?: number;
+    cpuFrequency?: number;
+  };
+  wifi?: {
+    connected?: boolean;
+    ssid?: string;
+    rssi?: number;
+    ip?: string;
+    gateway?: string;
+    dns?: string;
+    reconnectCount?: number;
+  };
+  connection?: {
+    successCount?: number;
+    failCount?: number;
+    consecutiveErrors?: number;
+    lastError?: string;
+  };
+}
+
 interface TelemetryPayload {
   apiKey: string;
   deviceMac: string;
-  readingType: 'fish' | 'plant' | 'heartbeat';
+  readingType: 'fish' | 'plant' | 'heartbeat' | 'healthcheck';
   readings?: SensorReading[];
   timestamp?: string;
   status?: string;
+  healthcheck?: HealthcheckPayload;
 }
 
 // Define thresholds for alerts (only for parameters in the CSV dataset)
@@ -111,6 +145,69 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         message: 'Heartbeat received',
+      });
+    }
+
+    // Handle healthcheck
+    if (readingType === 'healthcheck') {
+      const { healthcheck } = payload;
+
+      if (healthcheck) {
+        // Store healthcheck data in database
+        await db.insert(deviceHealthchecks).values({
+          deviceId: device[0].id,
+          // Device info
+          deviceName: healthcheck.device?.name,
+          deviceType: healthcheck.device?.type,
+          macAddress: healthcheck.device?.mac,
+          firmwareVersion: healthcheck.device?.firmwareVersion,
+          boardType: healthcheck.device?.board,
+          chipId: healthcheck.device?.chipId,
+          // System status
+          freeHeap: healthcheck.system?.freeHeap,
+          heapSize: healthcheck.system?.heapSize,
+          minFreeHeap: healthcheck.system?.minFreeHeap,
+          uptimeMs: healthcheck.system?.uptimeMs,
+          cpuFrequency: healthcheck.system?.cpuFrequency,
+          // WiFi status
+          wifiConnected: healthcheck.wifi?.connected,
+          wifiSsid: healthcheck.wifi?.ssid,
+          wifiRssi: healthcheck.wifi?.rssi,
+          wifiIp: healthcheck.wifi?.ip,
+          wifiGateway: healthcheck.wifi?.gateway,
+          wifiDns: healthcheck.wifi?.dns,
+          wifiReconnectCount: healthcheck.wifi?.reconnectCount,
+          // Connection stats
+          connectionSuccessCount: healthcheck.connection?.successCount,
+          connectionFailCount: healthcheck.connection?.failCount,
+          consecutiveErrors: healthcheck.connection?.consecutiveErrors,
+          lastError: healthcheck.connection?.lastError,
+          // Timestamp
+          receivedAt: new Date(),
+        });
+
+        // Update device last seen and status
+        await db
+          .update(devices)
+          .set({
+            status: 'online',
+            lastSeen: new Date(),
+          })
+          .where(eq(devices.id, device[0].id));
+
+        // Emit SSE update for healthcheck
+        sensorUpdateEmitter.emit({
+          type: 'healthcheck',
+          deviceId: device[0].id,
+          deviceMac,
+          healthcheck,
+          timestamp: timestamp || new Date().toISOString(),
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Healthcheck received',
       });
     }
 

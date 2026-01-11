@@ -330,6 +330,46 @@ export const cronHealthMetrics = pgTable('cron_health_metrics', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Device healthchecks table - stores ESP32 device diagnostics
+export const deviceHealthchecks = pgTable('device_healthchecks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  deviceId: uuid('device_id').references(() => devices.id).notNull(),
+
+  // Device info
+  deviceName: varchar('device_name', { length: 255 }),
+  deviceType: varchar('device_type', { length: 50 }),
+  macAddress: varchar('mac_address', { length: 17 }),
+  firmwareVersion: varchar('firmware_version', { length: 50 }),
+  boardType: varchar('board_type', { length: 100 }),
+  chipId: varchar('chip_id', { length: 50 }),
+
+  // System status
+  freeHeap: integer('free_heap'),
+  heapSize: integer('heap_size'),
+  minFreeHeap: integer('min_free_heap'),
+  uptimeMs: integer('uptime_ms'),
+  cpuFrequency: integer('cpu_frequency'),
+
+  // WiFi status
+  wifiConnected: boolean('wifi_connected'),
+  wifiSsid: varchar('wifi_ssid', { length: 64 }),
+  wifiRssi: integer('wifi_rssi'),
+  wifiIp: varchar('wifi_ip', { length: 45 }),
+  wifiGateway: varchar('wifi_gateway', { length: 45 }),
+  wifiDns: varchar('wifi_dns', { length: 45 }),
+  wifiReconnectCount: integer('wifi_reconnect_count'),
+
+  // Connection stats
+  connectionSuccessCount: integer('connection_success_count'),
+  connectionFailCount: integer('connection_fail_count'),
+  consecutiveErrors: integer('consecutive_errors'),
+  lastError: text('last_error'),
+
+  // Timestamp
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -365,3 +405,5 @@ export type CronExecutionLog = typeof cronExecutionLogs.$inferSelect;
 export type NewCronExecutionLog = typeof cronExecutionLogs.$inferInsert;
 export type CronHealthMetrics = typeof cronHealthMetrics.$inferSelect;
 export type NewCronHealthMetrics = typeof cronHealthMetrics.$inferInsert;
+export type DeviceHealthcheck = typeof deviceHealthchecks.$inferSelect;
+export type NewDeviceHealthcheck = typeof deviceHealthchecks.$inferInsert;

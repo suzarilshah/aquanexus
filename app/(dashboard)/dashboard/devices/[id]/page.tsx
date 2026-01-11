@@ -5,6 +5,7 @@ import { eq, and, desc, count } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DeviceSettings } from '@/components/devices/device-settings';
+import { DeviceHealthcheck } from '@/components/devices/device-healthcheck';
 import Link from 'next/link';
 import { ChevronLeft, Fish, Leaf, Activity, AlertTriangle, Clock, Cpu } from 'lucide-react';
 import { formatReadingInterval } from '@/lib/utils/device-intervals';
@@ -184,6 +185,9 @@ export default async function DeviceDetailPage({ params }: PageProps) {
           </CardHeader>
         </Card>
       </div>
+
+      {/* Device Healthcheck */}
+      <DeviceHealthcheck deviceId={device.id} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Device Settings */}

@@ -365,6 +365,8 @@ export default function FirmwareConfiguratorPage() {
     async function fetchDevices() {
       try {
         setDeviceError(null);
+        console.log('[FirmwarePage] Fetching devices...');
+
         const res = await fetch('/api/devices', {
           credentials: 'include', // Ensure cookies are sent
         });
@@ -381,6 +383,13 @@ export default function FirmwareConfiguratorPage() {
 
         const data = await res.json();
         const deviceList = data.devices || [];
+
+        // Log all devices and their types for debugging
+        console.log('[FirmwarePage] Devices loaded:', deviceList.length);
+        deviceList.forEach((d: Device) => {
+          console.log(`  - ${d.deviceName}: type="${d.deviceType}", mac="${d.deviceMac}"`);
+        });
+
         setDevices(deviceList);
 
         // Auto-select first device if available
@@ -388,7 +397,7 @@ export default function FirmwareConfiguratorPage() {
           setSelectedDeviceId(deviceList[0].id);
         }
       } catch (error) {
-        console.error('Failed to fetch devices:', error);
+        console.error('[FirmwarePage] Failed to fetch devices:', error);
         setDeviceError('Network error - please check your connection');
       } finally {
         setLoadingDevices(false);
@@ -648,6 +657,13 @@ export default function FirmwareConfiguratorPage() {
                             </span>
                           </Label>
 
+                          {/* Debug: Show loaded devices count */}
+                          {!loadingDevices && devices.length > 0 && (
+                            <div className="text-xs text-gray-400 mb-2">
+                              Found {devices.length} device(s): {devices.map(d => `${d.deviceName} (${d.deviceType})`).join(', ')}
+                            </div>
+                          )}
+
                           {loadingDevices ? (
                             <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
                               <Loader2 className="h-4 w-4 animate-spin text-cyan-500" />
@@ -705,15 +721,22 @@ export default function FirmwareConfiguratorPage() {
                                       <Select.Item
                                         key={device.id}
                                         value={device.id}
-                                        className="px-3 py-3 text-sm cursor-pointer hover:bg-cyan-50 rounded-lg outline-none flex items-center gap-3"
+                                        className="px-3 py-3 text-sm cursor-pointer hover:bg-cyan-50 rounded-lg outline-none flex items-center gap-3 data-[highlighted]:bg-cyan-50"
                                       >
-                                        {device.deviceType === 'fish' && <Fish className="h-4 w-4 text-cyan-500" />}
-                                        {device.deviceType === 'plant' && <Leaf className="h-4 w-4 text-emerald-500" />}
-                                        <div className="flex-1">
-                                          <div className="font-medium text-gray-900">{device.deviceName}</div>
-                                          <div className="text-xs text-gray-500 font-mono">{device.deviceMac}</div>
-                                        </div>
-                                        <Select.ItemIndicator>
+                                        {device.deviceType === 'fish' ? (
+                                          <Fish className="h-4 w-4 text-cyan-500 flex-shrink-0" />
+                                        ) : device.deviceType === 'plant' ? (
+                                          <Leaf className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                                        ) : (
+                                          <Cpu className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                        )}
+                                        <Select.ItemText asChild>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="font-medium text-gray-900 truncate">{device.deviceName}</div>
+                                            <div className="text-xs text-gray-500 font-mono truncate">{device.deviceMac}</div>
+                                          </div>
+                                        </Select.ItemText>
+                                        <Select.ItemIndicator className="flex-shrink-0">
                                           <Check className="h-4 w-4 text-cyan-500" />
                                         </Select.ItemIndicator>
                                       </Select.Item>

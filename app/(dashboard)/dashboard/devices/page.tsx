@@ -14,6 +14,7 @@ import {
   Radio,
   Sparkles,
   ArrowRight,
+  Server,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -83,39 +84,39 @@ export default async function DevicesPage() {
         <RegisterDeviceButton />
       </div>
 
-      {/* Stats Overview - Premium Cards */}
+      {/* Stats Overview - Clean Light Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Devices */}
-        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 p-5 transition-all duration-300 hover:shadow-xl hover:shadow-gray-900/20">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="group relative overflow-hidden rounded-2xl bg-white border border-gray-200 p-5 transition-all duration-300 hover:shadow-lg hover:border-blue-200">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="relative">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm">
-                <Cpu className="h-5 w-5 text-white" />
+              <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-100">
+                <Server className="h-5 w-5 text-blue-600" />
               </div>
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Total</span>
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider bg-blue-50 px-2 py-1 rounded-full">Total</span>
             </div>
             <div className="space-y-1">
-              <p className="text-4xl font-bold text-white tabular-nums">{totalDevices}</p>
-              <p className="text-sm text-gray-400">Registered devices</p>
+              <p className="text-4xl font-bold text-gray-900 tabular-nums">{totalDevices}</p>
+              <p className="text-sm text-gray-500">Registered devices</p>
             </div>
           </div>
         </div>
 
         {/* Online Devices */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 p-5 transition-all duration-300 hover:shadow-xl hover:border-emerald-100">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="group relative overflow-hidden rounded-2xl bg-white border border-gray-200 p-5 transition-all duration-300 hover:shadow-lg hover:border-emerald-200">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="relative">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-emerald-100">
+              <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50 border border-emerald-100">
                 <Wifi className="h-5 w-5 text-emerald-600" />
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 bg-emerald-50 px-2 py-1 rounded-full">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
-                <span className="text-xs font-medium text-emerald-600 uppercase tracking-wider">Live</span>
+                <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Live</span>
               </div>
             </div>
             <div className="space-y-1">
@@ -126,13 +127,13 @@ export default async function DevicesPage() {
         </div>
 
         {/* Offline Devices */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 p-5 transition-all duration-300 hover:shadow-xl hover:border-gray-200">
+        <div className="group relative overflow-hidden rounded-2xl bg-white border border-gray-200 p-5 transition-all duration-300 hover:shadow-lg hover:border-gray-300">
           <div className="relative">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gray-100">
+              <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 border border-gray-200">
                 <WifiOff className="h-5 w-5 text-gray-500" />
               </div>
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Idle</span>
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-100 px-2 py-1 rounded-full">Idle</span>
             </div>
             <div className="space-y-1">
               <p className="text-4xl font-bold text-gray-900 tabular-nums">{offlineDevices}</p>
@@ -141,22 +142,19 @@ export default async function DevicesPage() {
           </div>
         </div>
 
-        {/* Virtual Devices */}
-        <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-900 p-5 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/20">
-          <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-400/20 via-transparent to-transparent" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-indigo-400/20 via-transparent to-transparent" />
-          </div>
+        {/* Virtual Devices - Light Purple Theme */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white border border-purple-200 p-5 transition-all duration-300 hover:shadow-lg hover:border-purple-300 hover:shadow-purple-100">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-50/80 to-indigo-50/50 opacity-100" />
           <div className="relative">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm">
-                <Radio className="h-5 w-5 text-purple-300" />
+              <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-gradient-to-br from-purple-100 to-indigo-100 border border-purple-200">
+                <Radio className="h-5 w-5 text-purple-600" />
               </div>
-              <span className="text-xs font-medium text-purple-300 uppercase tracking-wider">Simulated</span>
+              <span className="text-xs font-semibold text-purple-600 uppercase tracking-wider bg-purple-100 px-2 py-1 rounded-full">Virtual</span>
             </div>
             <div className="space-y-1">
-              <p className="text-4xl font-bold text-white tabular-nums">{virtualDevices}</p>
-              <p className="text-sm text-purple-300">Virtual devices</p>
+              <p className="text-4xl font-bold text-gray-900 tabular-nums">{virtualDevices}</p>
+              <p className="text-sm text-purple-600">Simulated devices</p>
             </div>
           </div>
         </div>
@@ -182,7 +180,7 @@ export default async function DevicesPage() {
           {virtualDevices > 0 && (
             <Link
               href="/dashboard/simulator"
-              className="ml-auto flex items-center gap-2 text-sm text-purple-600 hover:text-purple-700 transition-colors"
+              className="ml-auto flex items-center gap-2 text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors bg-purple-50 px-3 py-1.5 rounded-full"
             >
               <Sparkles className="h-4 w-4" />
               <span>Manage Virtual Streaming</span>
