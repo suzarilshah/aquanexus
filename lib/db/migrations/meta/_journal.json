@@ -8,6 +8,13 @@
       "when": 1767885011037,
       "tag": "0000_brainy_ironclad",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1768104605966,
+      "tag": "0001_slippery_the_executioner",
+      "breakpoints": true
     }
   ]
 }

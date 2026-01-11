@@ -788,6 +788,7 @@ void sendHeartbeat() {
 
 // ========== COMPREHENSIVE HEALTHCHECK ==========
 // Sends complete device information for dashboard monitoring
+// Payload format matches AquaNexus /api/telemetry healthcheck endpoint
 void sendHealthcheck() {
   if (apiKey.length() == 0) {
     logDebug("HEALTHCHECK", "Skipping - no API key configured");
@@ -804,49 +805,42 @@ void sendHealthcheck() {
   doc["readingType"] = "healthcheck";
   doc["timestamp"] = getISOTimestamp();
 
+  // Create healthcheck object with nested structure matching API
+  JsonObject healthcheck = doc.createNestedObject("healthcheck");
+
   // Device Information
-  JsonObject deviceInfo = doc.createNestedObject("deviceInfo");
-  deviceInfo["name"] = DEVICE_NAME;
-  deviceInfo["type"] = DEVICE_TYPE;
-  deviceInfo["mac"] = deviceMac;
-  deviceInfo["firmware"] = firmwareVersion;
-  deviceInfo["board"] = "${config.board.name}";
-  deviceInfo["chipId"] = String((uint32_t)ESP.getEfuseMac(), HEX);
+  JsonObject device = healthcheck.createNestedObject("device");
+  device["name"] = DEVICE_NAME;
+  device["type"] = DEVICE_TYPE;
+  device["mac"] = deviceMac;
+  device["firmwareVersion"] = firmwareVersion;
+  device["board"] = "${config.board.name}";
+  device["chipId"] = String((uint32_t)ESP.getEfuseMac(), HEX);
 
   // System Status
-  JsonObject systemStatus = doc.createNestedObject("systemStatus");
-  systemStatus["freeHeap"] = ESP.getFreeHeap();
-  systemStatus["heapSize"] = ESP.getHeapSize();
-  systemStatus["minFreeHeap"] = ESP.getMinFreeHeap();
-  systemStatus["uptime"] = (millis() - bootTime) / 1000;  // seconds
-  systemStatus["cpuFreq"] = ESP.getCpuFreqMHz();
+  JsonObject system = healthcheck.createNestedObject("system");
+  system["freeHeap"] = ESP.getFreeHeap();
+  system["heapSize"] = ESP.getHeapSize();
+  system["minFreeHeap"] = ESP.getMinFreeHeap();
+  system["uptimeMs"] = millis() - bootTime;
+  system["cpuFrequency"] = ESP.getCpuFreqMHz();
 
   // WiFi Status
-  JsonObject wifiStatus = doc.createNestedObject("wifiStatus");
-  wifiStatus["connected"] = (WiFi.status() == WL_CONNECTED);
-  wifiStatus["ssid"] = WiFi.SSID();
-  wifiStatus["rssi"] = WiFi.RSSI();
-  wifiStatus["ip"] = WiFi.localIP().toString();
-  wifiStatus["gateway"] = WiFi.gatewayIP().toString();
-  wifiStatus["dns"] = WiFi.dnsIP().toString();
-  wifiStatus["reconnectCount"] = wifiReconnectCount;
+  JsonObject wifi = healthcheck.createNestedObject("wifi");
+  wifi["connected"] = (WiFi.status() == WL_CONNECTED);
+  wifi["ssid"] = WiFi.SSID();
+  wifi["rssi"] = WiFi.RSSI();
+  wifi["ip"] = WiFi.localIP().toString();
+  wifi["gateway"] = WiFi.gatewayIP().toString();
+  wifi["dns"] = WiFi.dnsIP().toString();
+  wifi["reconnectCount"] = wifiReconnectCount;
 
   // Connection Statistics
-  JsonObject connStats = doc.createNestedObject("connectionStats");
-  connStats["httpSuccessCount"] = httpSuccessCount;
-  connStats["httpFailCount"] = httpFailCount;
-  connStats["consecutiveErrors"] = consecutiveErrors;
-  connStats["lastSuccessfulSend"] = lastSuccessfulSend > 0 ? (millis() - lastSuccessfulSend) / 1000 : -1;
-  connStats["lastError"] = lastError;
-
-  // Configuration
-  JsonObject config = doc.createNestedObject("config");
-  config["serverHost"] = SERVER_HOST;
-  config["serverPort"] = SERVER_PORT;
-  config["sensorInterval"] = SENSOR_INTERVAL;
-  config["useAbly"] = USE_ABLY;
-  config["enableOTA"] = ENABLE_OTA;
-  config["useManualWifi"] = USE_MANUAL_WIFI;
+  JsonObject connection = healthcheck.createNestedObject("connection");
+  connection["successCount"] = httpSuccessCount;
+  connection["failCount"] = httpFailCount;
+  connection["consecutiveErrors"] = consecutiveErrors;
+  connection["lastError"] = lastError;
 
   String payload;
   serializeJson(doc, payload);

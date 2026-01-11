@@ -910,31 +910,130 @@ export default function FirmwareConfiguratorPage() {
                           </div>
                         </div>
 
-                        {/* WiFi Status Indicator */}
+                        {/* WiFi Validation Status */}
                         <div className={cn(
-                          "rounded-xl p-3 border",
-                          wifiSsid && wifiPassword
+                          "rounded-xl p-4 border space-y-3",
+                          wifiSsid && wifiPassword && wifiSsid.length >= 1 && wifiPassword.length >= 8
                             ? "bg-emerald-50 border-emerald-200"
-                            : "bg-amber-50 border-amber-200"
+                            : wifiSsid || wifiPassword
+                            ? "bg-amber-50 border-amber-200"
+                            : "bg-gray-50 border-gray-200"
                         )}>
                           <div className="flex items-center gap-2">
-                            {wifiSsid && wifiPassword ? (
+                            {wifiSsid && wifiPassword && wifiSsid.length >= 1 && wifiPassword.length >= 8 ? (
                               <>
                                 <Check className="h-4 w-4 text-emerald-600" />
                                 <span className="text-sm text-emerald-700 font-medium">
-                                  WiFi credentials configured
+                                  WiFi credentials ready for deployment
                                 </span>
                               </>
                             ) : (
                               <>
                                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                                 <span className="text-sm text-amber-700 font-medium">
-                                  Please enter WiFi credentials
+                                  Please complete WiFi configuration
                                 </span>
                               </>
                             )}
                           </div>
+
+                          {/* Validation checklist */}
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex items-center gap-2">
+                              {wifiSsid && wifiSsid.length >= 1 ? (
+                                <Check className="h-3 w-3 text-emerald-500" />
+                              ) : (
+                                <div className="h-3 w-3 rounded-full border border-gray-300" />
+                              )}
+                              <span className={wifiSsid ? "text-gray-700" : "text-gray-400"}>
+                                Network name (SSID) provided
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {wifiPassword && wifiPassword.length >= 8 ? (
+                                <Check className="h-3 w-3 text-emerald-500" />
+                              ) : (
+                                <div className="h-3 w-3 rounded-full border border-gray-300" />
+                              )}
+                              <span className={wifiPassword && wifiPassword.length >= 8 ? "text-gray-700" : "text-gray-400"}>
+                                Password minimum 8 characters {wifiPassword && wifiPassword.length > 0 && wifiPassword.length < 8 && `(${wifiPassword.length}/8)`}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {wifiSsid && wifiSsid.length <= 32 ? (
+                                <Check className="h-3 w-3 text-emerald-500" />
+                              ) : wifiSsid && wifiSsid.length > 32 ? (
+                                <AlertTriangle className="h-3 w-3 text-red-500" />
+                              ) : (
+                                <div className="h-3 w-3 rounded-full border border-gray-300" />
+                              )}
+                              <span className={wifiSsid && wifiSsid.length > 32 ? "text-red-600" : wifiSsid ? "text-gray-700" : "text-gray-400"}>
+                                SSID length valid (max 32 chars) {wifiSsid && wifiSsid.length > 32 && `(${wifiSsid.length}/32)`}
+                              </span>
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Connection Preview */}
+                        {wifiSsid && wifiPassword && wifiPassword.length >= 8 && (
+                          <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-xl p-4 border border-cyan-100">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center flex-shrink-0">
+                                <Wifi className="h-4 w-4 text-cyan-600" />
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <p className="text-sm font-medium text-cyan-800">
+                                  Connection Preview
+                                </p>
+                                <p className="text-xs text-cyan-700">
+                                  When the device boots, it will:
+                                </p>
+                                <ol className="text-xs text-cyan-600 space-y-1 list-decimal list-inside">
+                                  <li>Attempt to connect to &quot;{wifiSsid}&quot;</li>
+                                  <li>Retry up to 20 times if connection fails</li>
+                                  <li>Blink LED 3 times on successful connection</li>
+                                  <li>Send healthcheck data to the server</li>
+                                </ol>
+                                <div className="pt-2 border-t border-cyan-200 mt-2">
+                                  <p className="text-[10px] text-cyan-500 font-medium uppercase tracking-wider mb-1">
+                                    Connection Endpoint
+                                  </p>
+                                  <code className="text-xs bg-white/60 px-2 py-1 rounded text-cyan-800 font-mono">
+                                    https://{serverHost}/api/telemetry
+                                  </code>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Troubleshooting Tips */}
+                        <details className="bg-gray-50 rounded-xl border border-gray-200">
+                          <summary className="flex items-center gap-2 p-3 cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl">
+                            <AlertTriangle className="h-4 w-4 text-gray-500" />
+                            WiFi Connection Troubleshooting
+                          </summary>
+                          <div className="px-3 pb-3 space-y-2 text-xs text-gray-600">
+                            <div className="space-y-1.5 pt-2 border-t border-gray-200">
+                              <p className="font-medium text-gray-700">If device fails to connect:</p>
+                              <ul className="list-disc list-inside space-y-1 pl-2">
+                                <li>Verify SSID is spelled correctly (case-sensitive)</li>
+                                <li>Check password is correct</li>
+                                <li>Ensure WiFi is 2.4GHz (ESP32 doesn&apos;t support 5GHz)</li>
+                                <li>Move device closer to router</li>
+                                <li>Check if MAC filtering is enabled on router</li>
+                              </ul>
+                            </div>
+                            <div className="space-y-1.5 pt-2 border-t border-gray-200">
+                              <p className="font-medium text-gray-700">Serial Monitor Messages:</p>
+                              <ul className="list-disc list-inside space-y-1 pl-2 font-mono text-[10px]">
+                                <li>&quot;WiFi connected!&quot; - Success</li>
+                                <li>&quot;Connection failed&quot; - Check credentials</li>
+                                <li>&quot;RSSI: -XX dBm&quot; - Signal strength</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </details>
 
                         {/* Security Note */}
                         <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
